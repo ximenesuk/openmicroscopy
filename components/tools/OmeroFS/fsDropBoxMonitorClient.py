@@ -26,6 +26,10 @@ import IceGrid
 import IceImport
 import Glacier2
 
+from omero_model_DatasetI import DatasetI
+from omero_model_ProjectI import ProjectI
+from omero_model_ProjectDatasetLinkI import ProjectDatasetLinkI
+
 from omero.util import make_logname, ServerContext, Resources
 from omero.util.decorators import remoted, locked, perf
 from omero.util.import_candidates import as_dictionary
@@ -518,6 +522,46 @@ class MonitorClientI(monitors.MonitorClient):
             self.log.error("File added outside user directories: %s" % fileId)
         return exName
 
+    def getProjectFromPath(self, fileId=""):
+        """
+            Extract project name from path. If the project
+            cannot be extracted, then null will be returned, in which
+            case orphaned import will take place.
+        """
+        fileId = pathModule.path(fileId)
+        projName = None
+        parpath = fileId.parpath(self.dropBoxDir)
+        if parpath and len(parpath) >= 2:
+            fileParts = fileId.splitall()
+            i = -1 * len(parpath)
+            fileParts = fileParts[i:]
+            # For .../DropBox/user structure
+            if len(fileParts) >= 3:
+                projName = fileParts[1]
+        if not projName:
+            self.log.error("Couldn't determine project name: %s" % fileId)
+        return projName
+
+    def getDatasetFromPath(self, fileId=""):
+        """
+            Extract dataset name from path. If the dataset
+            cannot be extracted, then null will be returned, in which
+            case orphaned import will take place.
+        """
+        fileId = pathModule.path(fileId)
+        dataName = None
+        parpath = fileId.parpath(self.dropBoxDir)
+        if parpath and len(parpath) >= 2:
+            fileParts = fileId.splitall()
+            i = -1 * len(parpath)
+            fileParts = fileParts[i:]
+            # For .../DropBox/user structure
+            if len(fileParts) >= 4:
+                dataName = fileParts[2]
+        if not dataName:
+            self.log.error("Couldn't determine dataset name: %s" % fileId)
+        return dataName
+
     def loginUser(self, exName):
         """
         Logins in the given user and returns the client
@@ -582,6 +626,73 @@ class MonitorClientI(monitors.MonitorClient):
             return False
             
 
+    def getDatasetId(self, fileName):
+        """
+        Logins in the given user and returns the client
+        """
+
+        if not self.ctx.hasSession():
+             self.ctx.newSession()
+
+        sf = None
+        try:
+            sf = self.ctx.getSession()
+        except:
+            self.log.exception("Failed to get sf \n")
+
+        if not sf:
+            self.log.error("No connection")
+            return None
+
+        projName = self.getProjectFromPath(fileId=fileName)
+        dsetName = self.getDatasetFromPath(fileId=fileName)
+        if projName and dsetName:
+            self.log.info("Import into : %s/%s", projName, dsetName)
+            query = sf.getQueryService()
+            update = sf.getUpdateService()
+            proj = query.findByString("Project", "name", projName)
+            if proj:
+                self.log.info("Existing project : %s", proj.id.val)
+                p = omero.sys.Parameters()
+                p.map = {}
+                p.map["pid"] = proj.getId()
+                p.map["dsn"] = omero.rtypes.rstring(dsetName)
+                queryString = "select l from ProjectDatasetLink as l join fetch l.child as d where l.parent.id=:pid and d.name=:dsn"
+                link = query.findByQuery(queryString, p)
+                if link:
+                    dset = link.getChild()
+                    self.log.info("Existing dataset : %s", dset.id.val)
+                else:
+                    dset = DatasetI()
+                    dset.setName(omero.rtypes.rstring(dsetName))
+                    dset = update.saveAndReturnObject(dset)
+                    links = []
+                    l = ProjectDatasetLinkI()
+                    l.setChild(dset)
+                    l.setParent(proj)
+                    links.append(l)
+                    update.saveAndReturnArray(links)
+                    self.log.info("New  dataset : %s", dset.id.val)
+            else:
+                # Create project and dataset
+                proj = ProjectI()
+                proj.setName(omero.rtypes.rstring(projName))
+                proj = update.saveAndReturnObject(proj)
+                dset = DatasetI()
+                dset.setName(omero.rtypes.rstring(dsetName))
+                dset = update.saveAndReturnObject(dset)
+                links = []
+                l = ProjectDatasetLinkI()
+                l.setChild(dset)
+                l.setParent(proj)
+                links.append(l)
+                update.saveAndReturnArray(links)
+                self.log.info("New  project : %s", proj.id.val)
+                self.log.info("New  dataset : %s", dset.id.val)
+            return dset.id.val
+        else:
+            return None
+
     @perf
     def importFile(self, fileName, exName):
         """
@@ -595,6 +706,7 @@ class MonitorClientI(monitors.MonitorClient):
         if not key:
             self.log.info("File not imported: %s", fileName)
             return
+        dsid = self.getDatasetId(fileName)
 
         try:
             self.state.appropriateWait(self.throttleImport) # See ticket:5739
@@ -607,7 +719,11 @@ class MonitorClientI(monitors.MonitorClient):
 
             cli = omero.cli.CLI()
             cli.loadplugins()
-            cmd = ["-s", self.host, "-p", str(self.port), "-k", key, "import"]
+            # Import using dataset id if there is one
+            if dsid:
+                cmd = ["-s", self.host, "-p", str(self.port), "-k", key, "import", "-d", str(dsid)]
+            else:
+                cmd = ["-s", self.host, "-p", str(self.port), "-k", key, "import"]
             cmd.extend([str("---errs=%s"%t), str("---file=%s"%to), "--", "--agent=dropbox"])
             cmd.extend(shlex.split(self.importArgs))
             cmd.append(fileName)
