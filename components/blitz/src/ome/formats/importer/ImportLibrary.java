@@ -563,8 +563,8 @@ public class ImportLibrary implements IObservable
                 boolean doBigImage = false;
                 for (Pixels pixels : pixelsList)
                 {
-                    if ((pixels.getSizeX().getValue()
-                         * pixels.getSizeY().getValue()) > maxPlaneSize)
+                    if (((long) pixels.getSizeX().getValue()
+                         * (long) pixels.getSizeY().getValue()) > maxPlaneSize)
                     {
                         doBigImage = true;
                         log.debug("Image meets big image size criteria.");
@@ -874,6 +874,11 @@ public class ImportLibrary implements IObservable
         throws FormatException, IOException, ServerError
     {
         reader.setSeries(series);
+        int maxPlaneSize = maxPlaneWidth * maxPlaneHeight;
+        if (((long) reader.getSizeX()
+             * (long) reader.getSizeY()) > maxPlaneSize) {
+            return null;
+        }
         int bytesPerPixel = getBytesPerPixel(reader.getPixelType());
         MessageDigest md;
         try {
@@ -918,20 +923,52 @@ public class ImportLibrary implements IObservable
                                       MessageDigest md)
         throws FormatException, IOException, ServerError
     {
-        int bytesToRead = size.sizeX * size.sizeY * bytesPerPixel;
-        if (arrayBuf.length != bytesToRead) {
-            arrayBuf = new byte[bytesToRead];
-        }
-        int planeNumber = reader.getIndex(z, c, t);
-        PixelData data = reader.openPlane2D(fileName, planeNumber, arrayBuf);
-        ByteBuffer buf = data.getData();
-        arrayBuf = swapIfRequired(buf, fileName);
-        try {
-            md.update(arrayBuf);
-        }
-        catch (Exception e) {
-            // This better not happen. :)
-            throw new RuntimeException(e);
+        int tileHeight = reader.getOptimalTileHeight();
+        int tileWidth = reader.getOptimalTileWidth();
+        int planeNumber, x, y, w, h;
+        for (int tileOffsetY = 0;
+             tileOffsetY < (size.sizeY + tileHeight - 1) / tileHeight;
+             tileOffsetY++)
+        {
+            for (int tileOffsetX = 0;
+                 tileOffsetX < (size.sizeX + tileWidth - 1) / tileWidth;
+                 tileOffsetX++)
+            {
+                x = tileOffsetX * tileWidth;
+                y = tileOffsetY * tileHeight;
+                w = tileWidth;
+                h = tileHeight;
+                if ((x + tileWidth) > size.sizeX)
+                {
+                    w = size.sizeX - x;
+                }
+                if ((y + tileHeight) > size.sizeY)
+                {
+                    h = size.sizeY - y;
+                }
+                int bytesToRead = w * h * bytesPerPixel;
+                if (arrayBuf.length != bytesToRead)
+                {
+                    arrayBuf = new byte[bytesToRead];
+                }
+                planeNumber = reader.getIndex(z, c, t);
+                if (log.isDebugEnabled())
+                {
+                    log.debug(String.format(
+                            "Plane:%d X:%d Y:%d TileWidth:%d TileHeight:%d " +
+                            "arrayBuf.length:%d", planeNumber, x, y, w, h,
+                            arrayBuf.length));
+                }
+                arrayBuf = reader.openBytes(
+                        planeNumber, arrayBuf, x, y, w, h);
+                try {
+                    md.update(arrayBuf);
+                }
+                catch (Exception e) {
+                    // This better not happen. :)
+                    throw new RuntimeException(e);
+                }
+            }
         }
     }
 
