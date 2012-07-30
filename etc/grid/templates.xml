@@ -109,7 +109,7 @@
        <property name="omero.fs.port"  value="${ROUTERPORT}"/>
        <property name="omero.fs.maxRetries"  value="5"/>
        <property name="omero.fs.retryInterval"  value="3"/>
-       <property name="omero.fs.defaultDropBoxDir"  value="DropBox"/>
+       <property name="omero.fs.defaultDropBoxDir"  value="CLS Image Repository"/>
        <!--
           The remaining items can take the form of a semicolon separated list,
           one item for each user in the first property. Properties that
