@@ -543,50 +543,6 @@ public class ImportLibrary implements IObservable
     }
 
     /**
-     * Perform various specific operations on big image formats.
-     * @param reader The base reader currently being used.
-     * @param container The current import container we're to handle.
-     */
-    private void handleBigImageFormats(IFormatReader reader,
-                                       ImportContainer container)
-    {
-        String readerName = reader.getClass().getName();
-        if (fsLiteReaders.contains(readerName))
-        {
-            if (reader.getClass().equals(loci.formats.in.TiffDelegateReader.class)
-                || reader.getClass().equals(loci.formats.in.APNGReader.class)
-                || reader.getClass().equals(loci.formats.in.JPEGReader.class))
-            {
-                log.debug("Using TIFF/PNG/JPEG reader FS lite handling.");
-                List<Pixels> pixelsList = store.getSourceObjects(Pixels.class);
-                int maxPlaneSize = maxPlaneWidth * maxPlaneHeight;
-                boolean doBigImage = false;
-                for (Pixels pixels : pixelsList)
-                {
-                    if (((long) pixels.getSizeX().getValue()
-                         * (long) pixels.getSizeY().getValue()) > maxPlaneSize)
-                    {
-                        doBigImage = true;
-                        log.debug("Image meets big image size criteria.");
-                        break;
-                    }
-                }
-                if (!doBigImage)
-                {
-                    log.debug("Image does not meet big image size criteria.");
-                    return;
-                }
-            }
-            log.info("Big image, enabling big image import.");
-            container.setBigImage(true);
-        }
-        else
-        {
-            log.debug("FS lite disabled for: " + readerName);
-        }
-    }
-
-    /**
      * Perform an image import.  <em>Note: this method both notifies
      * {@link #observers} of error states AND throws the exception to cancel
      * processing.</em>
@@ -649,7 +605,6 @@ public class ImportLibrary implements IObservable
                 }
             }
             IFormatReader baseReader = reader.getImageReader().getReader();
-            handleBigImageFormats(baseReader, container);
             // Forcing these to false for now but remove completely once tested?
             boolean useMetadataFile = false;
             if (log.isInfoEnabled())
@@ -695,20 +650,18 @@ public class ImportLibrary implements IObservable
             }
             boolean saveSha1 = false;
             // Parse the binary data to generate min/max values
-            if (!container.getBigImage()) {
-                int seriesCount = reader.getSeriesCount();
-                for (int series = 0; series < seriesCount; series++) {
-                    ImportSize size = new ImportSize(fileName,
-                            pixList.get(series), reader.getDimensionOrder());
-                    Pixels pixels = pixList.get(series);
-                    long pixId = pixels.getId().getValue();
-                    MessageDigest md = parseData(fileName, series, size);
-                    if (md != null) {
-                        String s = OMEROMetadataStoreClient.byteArrayToHexString(
-                                md.digest());
-                        pixels.setSha1(store.toRType(s));
-                        saveSha1 = true;
-                    }
+            int seriesCount = reader.getSeriesCount();
+            for (int series = 0; series < seriesCount; series++) {
+                ImportSize size = new ImportSize(fileName,
+                        pixList.get(series), reader.getDimensionOrder());
+                Pixels pixels = pixList.get(series);
+                long pixId = pixels.getId().getValue();
+                MessageDigest md = parseData(fileName, series, size);
+                if (md != null) {
+                    String s = OMEROMetadataStoreClient.byteArrayToHexString(
+                            md.digest());
+                    pixels.setSha1(store.toRType(s));
+                    saveSha1 = true;
                 }
             }
             // Original file absolute path to original file map for uploading
