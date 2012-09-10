@@ -497,12 +497,26 @@ class MonitorClientI(monitors.MonitorClient):
 
     def getExperimenterFromPath(self, fileId=""):
         """
-            In this modified version only a single hard-coded experimenter
-            is used. It is possible this could be generalised, and then
-            done through configuration, if this is likely to be a use case
-            that could be useful.
+            Extract experimenter name from path. If the experimenter
+            cannot be extracted, then null will be returned, in which
+            case no import should take place.
         """
-        return "cls-admin"
+        fileId = pathModule.path(fileId)
+        exName = None
+        parpath = fileId.parpath(self.dropBoxDir)
+        if parpath and len(parpath) >= 2:
+            fileParts = fileId.splitall()
+            i = -1 * len(parpath)
+            fileParts = fileParts[i:]
+            # For .../DropBox/user structure
+            if len(fileParts) >= 2:
+                exName = fileParts[0]
+            # For .../DropBox/u/user structure
+            #if len(fileParts) >= 3:
+            #    exName = fileParts[1]
+        if not exName:
+            self.log.error("File added outside user directories: %s" % fileId)
+        return exName
 
     def loginUser(self, exName):
         """
