@@ -56,9 +56,6 @@ from omeroweb.decorators import login_required
 from omeroweb.connector import Connector
 
 logger = logging.getLogger(__name__)
-import sys
-logger.addHandler(logging.StreamHandler(sys.stdout))
-logger.setLevel(logging.DEBUG)
 
 try:
     from PIL import Image
