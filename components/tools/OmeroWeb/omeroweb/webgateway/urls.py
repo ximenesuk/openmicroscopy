@@ -45,6 +45,11 @@ If filepath is not specified, returns files at the top level of the
 repository, otherwise files within the specified filepath
 """
 
+repository_sha = (r'^repositories/(?P<index>\d+)/sha/(?P<filepath>.+)$', 'webgateway.views.repository_sha')
+"""
+json method: Returns the sha1 checksum of the specified file
+"""
+
 repository_root = (r'^repositories/(?P<index>\d+)/root/$', 'webgateway.views.repository_root')
 """
 json method: Returns the root and name property of a repository
@@ -336,6 +341,7 @@ urlpatterns = patterns('',
     repository,
     repository_list,
     repository_listfiles,
+    repository_sha,
     repository_root,
     repository_makedir,
     repository_download,
