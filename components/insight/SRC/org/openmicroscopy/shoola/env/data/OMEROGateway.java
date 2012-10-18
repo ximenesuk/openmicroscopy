@@ -6386,7 +6386,7 @@ class OMEROGateway
 	 * @throws ImportException If an error occurred while importing.
 	 */
 	Object importImage(SecurityContext ctx, ImportableObject object,
-			IObject container, ImportContainer ic, StatusLabel status,
+			IObject container, File file, ImportContainer ic, StatusLabel status,
 			boolean close, boolean hcs)
 		throws ImportException
 	{
@@ -6404,12 +6404,11 @@ class OMEROGateway
 			ic.setTarget(container);
 			ic.setUserPixels(object.getPixelsSize());
 			ic.setUseMetadataFile(true);
-			/*
 			if (object.isOverrideName()) {
 				int depth = object.getDepthForName();
 				ic.setCustomImageName(UIUtilities.getDisplayedFileName(
 						file.getAbsolutePath(), depth));
-			}*/
+			}
 			//library.importCandidates(new ImportConfig(), c);
 			List<Pixels> pixels = library.importImage(ic, 0, 0, 1);
 			Iterator<Pixels> j;

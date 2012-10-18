@@ -197,7 +197,7 @@ class OmeroImageServiceImpl
 				try {
 					if (ioContainer == null) label.setNoContainer();
 					ic = gateway.getImportCandidates(ctx, object, file, status);
-					result = gateway.importImage(ctx, object, ioContainer,
+					result = gateway.importImage(ctx, object, ioContainer, file,
 							ic.getContainers().get(0),
 							label, toClose, ImportableObject.isHCSFile(file));
 					if (result instanceof ImageData) {
@@ -1209,7 +1209,7 @@ class OmeroImageServiceImpl
 					status.resetFile(f);
 					if (ioContainer == null)
 						status.setNoContainer();
-					result = gateway.importImage(ctx, object, ioContainer,
+					result = gateway.importImage(ctx, object, ioContainer, file,
 							ic.getContainers().get(0),
 							status, close, ImportableObject.isHCSFile(f));
 					if (result instanceof ImageData) {
@@ -1247,7 +1247,7 @@ class OmeroImageServiceImpl
 				if (ioContainer == null)
 					status.setNoContainer();
 				ic = gateway.getImportCandidates(ctx, object, file, status);
-				result = gateway.importImage(ctx, object, ioContainer,
+				result = gateway.importImage(ctx, object, ioContainer, file,
 						ic.getContainers().get(0),
 					status, close, ImportableObject.isHCSFile(file));
 				if (result instanceof ImageData) {
