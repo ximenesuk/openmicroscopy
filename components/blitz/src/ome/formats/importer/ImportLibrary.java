@@ -458,7 +458,11 @@ public class ImportLibrary implements IObservable
         final byte[] buf = new byte[DEFAULT_ARRAYBUF_SIZE];  // 1 MB buffer
         final List<String> srcFiles = Arrays.asList(usedFiles);
         final int fileTotal = srcFiles.size();
-        final Import data = repo.prepareImport(srcFiles);
+        String customName = container.getCustomImageName();
+        if (container.getIsSPW()) {
+            customName = container.getCustomPlateName();
+        }
+        final Import data = repo.prepareImport(srcFiles, customName);
 
         notifyObservers(new ImportEvent.FILE_UPLOAD_STARTED(
                 null, 0, fileTotal, null, null, null));

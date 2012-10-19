@@ -101,7 +101,7 @@ public class ManagedRepositoryI extends PublicRepositoryI
      * Return a template based directory path.
      * (an option here would be to create the dir if it doesn't exist??)
      */
-    public Import prepareImport(java.util.List<String> paths, Ice.Current __current)
+    public Import prepareImport(java.util.List<String> paths, String userPath, Ice.Current __current)
             throws omero.ServerError {
 
         // This is the first part of the string which comes after:
@@ -114,7 +114,7 @@ public class ManagedRepositoryI extends PublicRepositoryI
 
         // If any two files clash in that chosen basePath directory, then
         // we want to suggest a similar alternative.
-        return suggestOnConflict(root.normPath, relPath, basePath, paths, __current);
+        return suggestOnConflict(root.normPath, relPath, basePath, paths, userPath, __current);
     }
 
 
@@ -343,12 +343,13 @@ public class ManagedRepositoryI extends PublicRepositoryI
      * @return Suggested new basePath in the case of conflicts.
      */
     protected Import suggestOnConflict(String trueRoot, String relPath,
-            String basePath, List<String> paths, Ice.Current __current)
+            String basePath, List<String> paths, String customName, Ice.Current __current)
             throws omero.ApiUsageException {
 
         // Static elements which will be re-used throughout
         final Import data = new Import(); // Return value
-        final String[] parts = splitLastElement(basePath);
+        final String userPath = splitLastElement(customName)[0];
+        final String[] parts = splitLastElement(userPath);
         final String nonEndPart = parts[0];
         final String uniquePathElement = parts[1];
         final File relUpToLast = new File(new File(relPath), nonEndPart);

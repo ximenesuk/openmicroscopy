@@ -199,7 +199,7 @@ module omero {
              * overwritten or interfering with one another, a new directory
              * may be created for the current session.
              **/
-            Import prepareImport(omero::api::StringSet paths) throws ServerError;
+            Import prepareImport(omero::api::StringSet paths, string customName) throws ServerError;
 
             /**
              *
