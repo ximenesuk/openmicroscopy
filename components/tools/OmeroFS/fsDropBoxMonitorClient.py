@@ -30,6 +30,8 @@ from omero_model_DatasetI import DatasetI
 from omero_model_ProjectI import ProjectI
 from omero_model_ProjectDatasetLinkI import ProjectDatasetLinkI
 
+from omero import client
+from omero.gateway import BlitzGateway
 from omero.util import make_logname, ServerContext, Resources
 from omero.util.decorators import remoted, locked, perf
 from omero.util.import_candidates import as_dictionary
@@ -582,11 +584,13 @@ class MonitorClientI(monitors.MonitorClient):
 
         p = omero.sys.Principal()
         p.name  = exName 
-        p.group = "user"
         p.eventType = "User"
 
         try:
-            exp = sf.getAdminService().lookupExperimenter(exName)
+            admin = sf.getAdminService()
+            exp = admin.lookupExperimenter(exName)
+            group = admin.getDefaultGroup(exp.id.val)
+            p.group = group.name.val
             sess = sf.getSessionService().createSessionWithTimeouts(p, self.timeToLive, self.timeToIdle)
             return sess.uuid.val
         except omero.ApiUsageException:
@@ -626,9 +630,9 @@ class MonitorClientI(monitors.MonitorClient):
             return False
             
 
-    def getDatasetId(self, fileName):
+    def getDatasetId(self, fileName, exName, key):
         """
-        Logins in the given user and returns the client
+        Checks and creates the project and dataset
         """
 
         if not self.ctx.hasSession():
@@ -636,7 +640,7 @@ class MonitorClientI(monitors.MonitorClient):
 
         sf = None
         try:
-            sf = self.ctx.getSession()
+            sf = client().joinSession(key)
         except:
             self.log.exception("Failed to get sf \n")
 
@@ -648,47 +652,71 @@ class MonitorClientI(monitors.MonitorClient):
         dsetName = self.getDatasetFromPath(fileId=fileName)
         if projName and dsetName:
             self.log.info("Import into : %s/%s", projName, dsetName)
+            admin = sf.getAdminService()
             query = sf.getQueryService()
             update = sf.getUpdateService()
-            proj = query.findByString("Project", "name", projName)
-            if proj:
+
+            eid = admin.lookupExperimenter(exName).id
+            gid = admin.getDefaultGroup(eid.val).id
+            opts = {'omero.group':str(gid.val)}
+            p = omero.sys.Parameters()
+            p.map = {}
+            p.map["eid"] = eid
+            p.map["gid"] = gid
+            p.map["prn"] = omero.rtypes.rstring(projName)
+            p.map["dsn"] = omero.rtypes.rstring(dsetName)
+            queryString = ("select l from ProjectDatasetLink l "
+                            "join fetch l.parent as p join fetch l.child as d "
+                            "where p.name=:prn and d.name=:dsn "
+                            "and p.details.owner.id=:eid "
+                            "and p.details.group.id=:gid "
+                            "and d.details.owner.id=:eid "
+                            "and d.details.group.id=:gid")
+            linkList = query.findAllByQuery(queryString, p)
+            if linkList:
+                # Use first existing project and dataset
+                link = linkList[0]
+                proj = link.getParent()
+                dset = link.getChild()
                 self.log.info("Existing project : %s", proj.id.val)
-                p = omero.sys.Parameters()
-                p.map = {}
-                p.map["pid"] = proj.getId()
-                p.map["dsn"] = omero.rtypes.rstring(dsetName)
-                queryString = "select l from ProjectDatasetLink as l join fetch l.child as d where l.parent.id=:pid and d.name=:dsn"
-                link = query.findByQuery(queryString, p)
-                if link:
-                    dset = link.getChild()
-                    self.log.info("Existing dataset : %s", dset.id.val)
-                else:
+                self.log.info("Existing dataset : %s", dset.id.val)
+            else:
+                queryString = ("select p from Project as p "
+                                "where p.name=:prn "
+                                "and p.details.owner.id=:eid "
+                                "and p.details.group.id=:gid")
+                projList = query.findAllByQuery(queryString, p)
+                if projList:
+                    # Use first existing project
+                    proj = projList[0]
+                    self.log.info("Existing project : %s", proj.id.val)
+                    # Create dataset and link to project
                     dset = DatasetI()
                     dset.setName(omero.rtypes.rstring(dsetName))
-                    dset = update.saveAndReturnObject(dset)
+                    dset = update.saveAndReturnObject(dset, opts)
                     links = []
                     l = ProjectDatasetLinkI()
                     l.setChild(dset)
                     l.setParent(proj)
                     links.append(l)
-                    update.saveAndReturnArray(links)
+                    update.saveAndReturnArray(links, opts)
                     self.log.info("New  dataset : %s", dset.id.val)
-            else:
-                # Create project and dataset
-                proj = ProjectI()
-                proj.setName(omero.rtypes.rstring(projName))
-                proj = update.saveAndReturnObject(proj)
-                dset = DatasetI()
-                dset.setName(omero.rtypes.rstring(dsetName))
-                dset = update.saveAndReturnObject(dset)
-                links = []
-                l = ProjectDatasetLinkI()
-                l.setChild(dset)
-                l.setParent(proj)
-                links.append(l)
-                update.saveAndReturnArray(links)
-                self.log.info("New  project : %s", proj.id.val)
-                self.log.info("New  dataset : %s", dset.id.val)
+                else:
+                    # Create project and dataset and link
+                    proj = ProjectI()
+                    proj.setName(omero.rtypes.rstring(projName))
+                    proj = update.saveAndReturnObject(proj, opts)
+                    dset = DatasetI()
+                    dset.setName(omero.rtypes.rstring(dsetName))
+                    dset = update.saveAndReturnObject(dset, opts)
+                    links = []
+                    l = ProjectDatasetLinkI()
+                    l.setChild(dset)
+                    l.setParent(proj)
+                    links.append(l)
+                    update.saveAndReturnArray(links, opts)
+                    self.log.info("New  project : %s", proj.id.val)
+                    self.log.info("New  dataset : %s", dset.id.val)
             return dset.id.val
         else:
             return None
@@ -706,7 +734,7 @@ class MonitorClientI(monitors.MonitorClient):
         if not key:
             self.log.info("File not imported: %s", fileName)
             return
-        dsid = self.getDatasetId(fileName)
+        dsid = self.getDatasetId(fileName, exName, key)
 
         try:
             self.state.appropriateWait(self.throttleImport) # See ticket:5739
