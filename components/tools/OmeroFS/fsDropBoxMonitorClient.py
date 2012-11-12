@@ -31,7 +31,6 @@ from omero_model_ProjectI import ProjectI
 from omero_model_ProjectDatasetLinkI import ProjectDatasetLinkI
 
 from omero import client
-from omero.gateway import BlitzGateway
 from omero.util import make_logname, ServerContext, Resources
 from omero.util.decorators import remoted, locked, perf
 from omero.util.import_candidates import as_dictionary
