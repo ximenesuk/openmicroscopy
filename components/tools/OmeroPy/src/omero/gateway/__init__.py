@@ -2197,8 +2197,7 @@ class _BlitzGateway (object):
             if proxy is not None:
                 repository = omero.grid.ManagedRepositoryPrx.checkedCast(proxy)
                 if repository is not None:
-                    description = repository.root()
-                    return (repository, description)
+                    return repository
         raise AttributError('Repository of type %s unavailable' % klass)
 
 
