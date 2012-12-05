@@ -1692,16 +1692,7 @@ def su (request, user, conn=None, **kwargs):
     return True
 
 def get_repository(conn, klass):
-    klass = '%sPrx' % klass
-    klass = getattr(omero.grid, klass)
-    sr = conn.getSharedResources()
-    repositories = sr.repositories()
-    for index, proxy in enumerate(repositories.proxies):
-        repository = klass.checkedCast(proxy)
-        if repository is not None:
-            description = repositories.descriptions[index]
-            return (repository, description)
-    raise AttributError('Repository of type %s unavailable' % klass)
+    return conn.lookupRepository(klass)
 
 @login_required()
 @jsonp
