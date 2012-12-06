@@ -1691,9 +1691,6 @@ def su (request, user, conn=None, **kwargs):
     conn.seppuku()
     return True
 
-def get_repository(conn, klass):
-    return conn.lookupRepository(klass)
-
 @login_required()
 @jsonp
 def repositories(request, conn=None, **kwargs):
@@ -1715,7 +1712,7 @@ def repository(request, klass, conn=None, **kwargs):
     """
     Returns a repository and its root property
     """
-    repository = get_repository(conn, klass)
+    repository = conn.lookupRepository(klass)
     return dict(repository=OriginalFileWrapper(conn=conn, obj=repository.root()).simpleMarshal(),
                 root=unwrap(repository.root().path))
 
@@ -1728,7 +1725,7 @@ def repository_list(request, klass, filepath=None, conn=None, **kwargs):
     returns files at the top level of the repository, otherwise files within
     the specified filepath
     """
-    repository = get_repository(conn, klass)
+    repository = conn.lookupRepository(klass)
     name = unwrap(repository.root().name)
     root = os.path.join(unwrap(repository.root().path), name)
     if filepath:
@@ -1748,7 +1745,7 @@ def repository_listfiles(request, klass, filepath=None, conn=None, **kwargs):
     If filepath is not specified, returns files at the top level of the
     repository, otherwise files within the specified filepath
     """
-    repository = get_repository(conn, klass)
+    repository = conn.lookupRepository(klass)
     name = unwrap(repository.root().name)
     root = os.path.join(unwrap(repository.root().path), name)
     if filepath:
@@ -1772,7 +1769,7 @@ def repository_sha(request, klass, filepath, conn=None, **kwargs):
     """
     json method: Returns the sha1 checksum of the specified file
     """
-    repository = get_repository(conn, klass)
+    repository = conn.lookupRepository(klass)
     name = unwrap(repository.root().name)
     fullpath = os.path.join(unwrap(repository.root().path), name, filepath)
 
@@ -1795,7 +1792,7 @@ def repository_root(request, klass, conn=None, **kwargs):
     """
     Returns the root and name property of a repository
     """
-    repository = get_repository(conn, klass)
+    repository = conn.lookupRepository(klass)
     return dict(root=unwrap(repository.root().path),
                 name=unwrap(repository.root().name))
 
@@ -1807,7 +1804,7 @@ def repository_makedir(request, klass, dirpath, conn=None, **kwargs):
     """
     Creates a directory in a repository
     """
-    repository = get_repository(conn, klass)
+    repository = conn.lookupRepository(klass)
     root = unwrap(repository.root().path)
     name = unwrap(repository.root().name)
 
@@ -1843,7 +1840,7 @@ def repository_download(request, klass, filepath, conn=None, **kwargs):
     Downloads a file from a repository.  Supports the HTTP_RANGE header to
     perform partial downloads or download continuation
     """
-    repository = get_repository(conn, klass)
+    repository = conn.lookupRepository(klass)
     name = unwrap(repository.root().name)
     fullpath = os.path.join(unwrap(repository.root().path), name, filepath)
 
@@ -1959,7 +1956,7 @@ def process_request(require_uploadId):
         @uncloak_self
         def decorated(self, request, klass, filepath, conn, **kwargs):
 
-            repository = get_repository(conn, klass)
+            repository = conn.lookupRepository(klass)
             name = unwrap(repository.root().name)
             fullpath = os.path.join(unwrap(repository.root().path), name, filepath)
 
