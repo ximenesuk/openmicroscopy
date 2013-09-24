@@ -23,28 +23,12 @@ from omero.rtypes import *
 
 class TestAdmin(lib.ITest):
 
-    def testGetGroup(self):
-        a = self.client.getSession().getAdminService()
-        l = a.lookupGroups()
-        g = a.getGroup(l[0].getId().val)
-        self.assert_( 0 != g.sizeOfGroupExperimenterMap() )
+    #def testGetGroup(self): -> AdminServiceTest.testLookupGroups()
 
-    def testSetGroup(self):
-        a = self.client.getSession().getAdminService()
-        ec = a.getEventContext()
-        uid = ec.userId
-
-        # Add user to new group to test setting default
-        e = a.getExperimenter(uid)
-        admin = self.root.sf.getAdminService()
-        grp = self.new_group()
-        admin.addGroups(e, [grp])
-
-        a.setDefaultGroup(e, grp)
-
-        dg = self.client.getSession().getAdminService().getDefaultGroup(uid)
-        self.assertEqual(dg.id.val, grp.id.val)
+    #def testSetGroup(self): -> AdminServiceTest.testChangeDefaultGroup()
     
+    # partially -> AdminServiceTest.testChangePasswordByUser()
+    # partially -> AdminServiceTest.testChangePasswordByAdmin()
     def testChangePassword(self):
         """
         See ticket:3201
