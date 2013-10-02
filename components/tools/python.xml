@@ -56,16 +56,18 @@ ice_compatibility="${versions.ice}"
     </target>
     <target name="python-integration" unless="env.NOPYTHON">
         <mkdir dir="${testreports.dir}"/>
-        <py_test/><!-- all -->
+        <py_test mark="-m ${MARK}"/><!-- all -->
     </target>
 
     <macrodef name="py_test">
         <attribute name="target" default="${basedir}/test"/>
+        <attribute name="mark" default=""/>
         <sequential>
             <setup_py failonerror="${test.with.fail}">
                 <env key="OMERODIR" value="${dist.dir}"/>
                 <env key="ICE_CONFIG" value="${env.ICE_CONFIG}"/>
                 <arg value="test"/>
+                <arg value="@{mark}"/>
                 <arg value="-v"/>
                 <arg value="-s"/>
                 <arg file="@{target}"/>
