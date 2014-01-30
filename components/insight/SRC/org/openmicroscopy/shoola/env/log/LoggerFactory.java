@@ -101,7 +101,11 @@ public class LoggerFactory
 			else logFile = new File(c.getHomeDir(), logFileName);
 		}
 		
-		return new LoggerImpl(relPathName, logFile.getAbsolutePath());
+		try {
+			return new LoggerImpl(relPathName, logFile.getAbsolutePath());
+		} catch (ClassCastException ce) {
+			return makeNoOpLogger();
+		}
 	}
 	
 	/**

@@ -83,15 +83,21 @@ class LoggerImpl
      * @param configFile  The pathname of a configuration file.
      * @param absFile     The absolute pathname of the log file.
      */
-    LoggerImpl(String configFile, String absFile)
+    LoggerImpl(String configFile, String absFile) throws ClassCastException
     {
-        LoggerContext context = (LoggerContext) org.slf4j.LoggerFactory.getILoggerFactory();
+        LoggerContext context;
         try {
-          JoranConfigurator configurator = new JoranConfigurator();
-          configurator.setContext(context);
-          context.reset();
-          context.putProperty(LOG_FILE_NAME, absFile);
-          configurator.doConfigure(configFile);
+            context = (LoggerContext) org.slf4j.LoggerFactory.getILoggerFactory();
+        } catch (ClassCastException ce) {
+            throw ce;
+        }
+
+        try {
+            JoranConfigurator configurator = new JoranConfigurator();
+            configurator.setContext(context);
+            context.reset();
+            context.putProperty(LOG_FILE_NAME, absFile);
+            configurator.doConfigure(configFile);
         } catch (JoranException je) {
           // StatusPrinter will handle this
         }
