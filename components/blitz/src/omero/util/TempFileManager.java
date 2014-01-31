@@ -18,10 +18,12 @@ import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-// CGB: Needs replacing with logback equivalent.
-// import org.apache.log4j.ConsoleAppender;
-// import org.apache.log4j.Level;
-// import org.apache.log4j.SimpleLayout;
+
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.ConsoleAppender;
 
 /**
  * Creates temporary files and folders and makes a best effort to remove them on
@@ -38,16 +40,19 @@ public class TempFileManager {
     static {
         // Activating logging at a static level
         if (System.getenv().containsKey("DEBUG")) {
-            // CGB: Needs replacing with logback equivalent.
-            //ConsoleAppender console = new ConsoleAppender();
-            //console.setName("System.err");
-            //console.setTarget(ConsoleAppender.SYSTEM_ERR);
-            //console.setLayout(new SimpleLayout());
-            //console.activateOptions();
-            //org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("omero");
-            //logger.addAppender(console);
-            //logger.setLevel(Level.DEBUG);
-            //logger.addAppender(console);
+            ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger("omero");
+            LoggerContext loggerContext = logger.getLoggerContext();
+            PatternLayoutEncoder encoder = new PatternLayoutEncoder();
+            encoder.setContext(loggerContext);
+            encoder.setPattern("%-5level - %msg%n");
+            encoder.start();
+            ConsoleAppender<ILoggingEvent> appender = new ConsoleAppender<ILoggingEvent>();
+            appender.setContext(loggerContext);
+            appender.setEncoder(encoder);
+            appender.setTarget("System.err");
+            appender.start();
+            logger.setLevel(Level.DEBUG);
+            logger.addAppender(appender);
         }
     }
 
@@ -465,16 +470,18 @@ public class TempFileManager {
 
             // Debug may already be activated. See static block above.
             if (args.contains("--debug") && ! System.getenv().containsKey("DEBUG")) {
-                // CGB: Needs replacing with logback equivalent.
-                //ConsoleAppender console = new ConsoleAppender();
-                //console.setName("System.err");
-                //console.setTarget(ConsoleAppender.SYSTEM_ERR);
-                //console.setLayout(new SimpleLayout());
-                //console.activateOptions();
-                //org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger("omero");
-                //logger.addAppender(console);
-                //logger.setLevel(Level.DEBUG);
-                //logger.addAppender(console);
+                ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger("omero");
+                LoggerContext loggerContext = logger.getLoggerContext();
+                PatternLayoutEncoder encoder = new PatternLayoutEncoder();
+                encoder.setContext(loggerContext);
+                encoder.setPattern("%-5level - %msg%n");
+                encoder.start();
+                ConsoleAppender<ILoggingEvent> appender = new ConsoleAppender<ILoggingEvent>();
+                appender.setContext(loggerContext);
+                appender.setEncoder(encoder);
+                appender.setTarget("System.err");
+                appender.start();
+                logger.setLevel(Level.DEBUG);
             }
 
             if (args.contains("clean")) {
