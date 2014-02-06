@@ -11,8 +11,9 @@ import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import omero.LockTimeout;
 import omero.ServerError;
@@ -41,7 +42,7 @@ import Ice.ObjectNotExistException;
  */
 public class DeleteCallbackI {
 
-    private final Logger logger = Logger.getLogger(DeleteCallbackI.class.getName());
+    private final Logger logger = LoggerFactory.getLogger(DeleteCallbackI.class.getName());
 
     @SuppressWarnings("unused")
     private final Ice.ObjectAdapter adapter;
@@ -147,7 +148,7 @@ public class DeleteCallbackI {
                     try {
                         finished(handle.errors());
                     } catch (Exception e) {
-                        logger.log(Level.SEVERE,
+                        logger.error(
                                 "Error calling DeleteCallbackI.finished:" + handle, e);
                     }
                 }
@@ -156,7 +157,7 @@ public class DeleteCallbackI {
                 ce.initCause(onee);
                 throw ce;
             } catch (Exception e) {
-                logger.log(Level.SEVERE,
+                logger.error(
                         "Error polling DeleteHandlePrx:" + handle, e);
             }
         }
@@ -170,7 +171,7 @@ public class DeleteCallbackI {
         try {
             q.put(errors);
         } catch (InterruptedException e) {
-            logger.log(Level.INFO, "Interrupted during q.put", e);
+            logger.info("Interrupted during q.put", e);
         }
     }
 
@@ -179,7 +180,7 @@ public class DeleteCallbackI {
         try {
             handle.close();
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "Error calling DeleteHandlePrx.close:"
+            logger.error("Error calling DeleteHandlePrx.close:"
                     + handle, e);
         }
     }
