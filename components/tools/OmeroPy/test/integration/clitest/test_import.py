@@ -37,8 +37,8 @@ class TestImport(CLITest):
         return wells[0].plate.id.val
 
     @pytest.mark.parametrize("obj_type", ["image", "plate"])
-    @pytest.mark.parametrize("name", [None, 'name'])
-    @pytest.mark.parametrize("description", [None, 'description'])
+    @pytest.mark.parametrize("name", [None, 'name', '⚆⚇⚈⚉'])
+    @pytest.mark.parametrize("description", [None, 'description', '☰☱☲☳☴☵☶☷'])
     def testNamingArguments(self, obj_type, name, description, tmpdir):
 
         if obj_type == 'image':
