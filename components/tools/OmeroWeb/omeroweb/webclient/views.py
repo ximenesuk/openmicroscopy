@@ -1104,6 +1104,10 @@ def batch_annotate(request, conn=None, **kwargs):
     manager = BaseContainer(conn)
     batchAnns = manager.loadBatchAnnotations(objs)
     figScripts = manager.listFigureScripts(objs)
+    if 'image' in objs and len(objs) > 0:
+        iids = [i.getId() for i in objs['image']]
+        filesetInfo = manager.getFilesetFileInfo(iids)
+
 
     obj_ids = []
     obj_labels = []
@@ -1116,7 +1120,7 @@ def batch_annotate(request, conn=None, **kwargs):
 
     context = {'form_comment':form_comment, 'obj_string':obj_string, 'link_string': link_string,
             'obj_labels': obj_labels, 'batchAnns': batchAnns, 'batch_ann':True, 'index': index,
-            'figScripts':figScripts}
+            'figScripts':figScripts, 'filesetInfo': filesetInfo}
     context['template'] = "webclient/annotations/batch_annotate.html"
     context['webclient_path'] = request.build_absolute_uri(reverse('webindex'))
     return context
@@ -1802,6 +1806,21 @@ def download_orig_metadata(request, imageId, conn=None, **kwargs):
     rsp['Content-Length'] = len(rspText)
     rsp['Content-Disposition'] = 'attachment; filename=Original_Metadata.txt'
     return rsp
+
+
+@render_response()
+def download_placeholder(request):
+    """
+    Page displays a simple "Preparing download..." message and redirects to the 'url'.
+    We construct the url and query string from request: 'url' and 'ids'.
+    """
+
+    download_url = request.REQUEST.get('url')
+    targetIds = request.REQUEST.get('ids')      # E.g. image-1|image-2
+    query = "&".join([i.replace("-", "=") for i in targetIds.split("|")])
+    download_url = download_url + "?" + query
+
+    return {'template': "webclient/annotations/download_placeholder.html", 'url': download_url}
 
 
 @login_required()

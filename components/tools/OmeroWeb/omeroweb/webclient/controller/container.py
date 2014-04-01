@@ -455,6 +455,23 @@ class BaseContainer(BaseController):
         return False
 
 
+    def getFilesetFileInfo (self, imageIds):
+        """ Gets summary of Original Files that are part of the FS Fileset linked to images """
+
+        params = omero.sys.ParametersI()
+        params.addIds(imageIds)
+        query = "select distinct(fse) from FilesetEntry as fse "\
+                "left outer join fse.fileset as fs "\
+                "left outer join fetch fse.originalFile as f "\
+                "left outer join fs.images as image where image.id in (:ids)"
+        queryService = self.conn.getQueryService()
+        fsinfo = queryService.findAllByQuery(query, params, self.conn.SERVICE_OPTS)
+        fsCount = len(fsinfo)
+        fsSize = sum([f.originalFile.getSize().val for f in fsinfo])
+        filesetFileInfo = {'count': fsCount, 'size': fsSize}
+        return filesetFileInfo
+
+
     def loadBatchAnnotations(self, objDict, ann_ids=None, addedByMe=False):
         """ 
         Look up the Tags, Files, Comments, Ratings etc that are on one or more of 

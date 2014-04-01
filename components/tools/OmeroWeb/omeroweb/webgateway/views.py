@@ -1687,16 +1687,28 @@ def full_viewer (request, iid, conn=None, **kwargs):
 
 
 @login_required(doConnectionCleanup=False)
-def archived_files(request, iid, conn=None, **kwargs):
+def archived_files(request, iid=None, conn=None, **kwargs):
     """
     Downloads the archived file(s) as a single file or as a zip (if more than one file)
     """
-    image = conn.getObject("Image", iid)
-    if image is None:
-        logger.debug("Cannot download archived file becuase Image does not exist.")
-        return HttpResponseServerError("Cannot download archived file becuase Image does not exist (id:%s)." % (iid))
+    if iid is None:
+        imgIds = request.REQUEST.getlist('image')
+        if len(imgIds) == 0:
+            return HttpResponseServerError("No images specified in request. Use ?image=123")
+    else:
+        imgIds = [iid]
 
-    files = list(image.getImportedImageFiles())
+    images = list(conn.getObjects("Image", imgIds))
+    if len(images) == 0:
+        logger.debug("Cannot download archived file becuase Images not found.")
+        return HttpResponseServerError("Cannot download archived file becuase Images not found (ids: %s)." % (imgIds))
+
+    # make list of all files, removing duplicates
+    fileMap = {}
+    for image in images:
+        for f in image.getImportedImageFiles():
+            fileMap[f.getId()] = f
+    files = fileMap.values()
 
     if len(files) == 0:
         logger.debug("Tried downloading archived files from image with no files archived.")
@@ -1736,7 +1748,8 @@ def archived_files(request, iid, conn=None, **kwargs):
             finally:
                 shutil.rmtree(temp_zip_dir, ignore_errors=True)
 
-            file_name = "%s.zip" % image.getName().replace(" ","_")
+            zipName = request.REQUEST.get('zipname', image.getName())
+            file_name = "%s.zip" % zipName.replace(" ","_")
 
             # return the zip or single file
             archivedFile_data = FileWrapper(temp)
