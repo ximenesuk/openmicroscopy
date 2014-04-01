@@ -1,14 +1,28 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+
+#
+# Copyright (C) 2008-2014 Glencoe Software, Inc. All rights reserved.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
 """
    Plugin for viewing and controlling active sessions for a local user.
 
    Plugin read by omero.cli.Cli during initialization. The method(s)
    defined here will be added to the Cli class for later use.
-
-   Copyright 2008 Glencoe Software, Inc. All rights reserved.
-   Use is subject to license terms supplied in LICENSE.txt
-
 """
 
 
@@ -151,6 +165,9 @@ class SessionsControl(BaseControl):
 
     def help(self, args):
         self.ctx.err(LONGHELP % {"prog": args.prog})
+
+    def sudo(self, args):
+        print args
 
     def login(self, args):
         """
@@ -321,9 +338,13 @@ class SessionsControl(BaseControl):
             while True:
                 try:
                     if not pasw:
-                        pasw = self.ctx.input("Password:", hidden=True,
+                        if args.sudo:
+                            prompt = "Password for %s:" % args.sudo
+                        else:
+                            prompt = "Password:"
+                        pasw = self.ctx.input(prompt, hidden=True,
                                               required=True)
-                    rv = store.create(name, pasw, props)
+                    rv = store.create(name, pasw, props, sudo=args.sudo)
                     break
                 except PermissionDeniedException, pde:
                     tries -= 1
