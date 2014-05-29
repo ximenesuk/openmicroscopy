@@ -29,7 +29,6 @@ import sys
 import os
 
 sys.path.append("..")
-from test_setup import PyTest
 
 for tools in glob.glob("../../../lib/repository/setuptools*.egg"):
     if tools.find(".".join(map(str, sys.version_info[0:2]))) > 0:
@@ -58,9 +57,5 @@ Python bindings to the OMERO.blitz server.
       package_dir = {"": "target"},
       packages=packages,
       package_data={'omero.gateway':['pilfonts/*'], 'omero.gateway.scripts':['imgs/*']},
-      cmdclass = {'test': PyTest},
       tests_require=['pytest'],
 )
-
-
-
