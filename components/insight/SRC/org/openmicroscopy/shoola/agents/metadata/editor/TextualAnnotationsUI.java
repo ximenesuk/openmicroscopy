@@ -230,6 +230,7 @@ class TextualAnnotationsUI
 		commentArea.setEnabled(enabled);
 		
 		if (!CollectionUtils.isEmpty(list)) {
+			Collections.reverse(list);
 			Color c = UIUtilities.BACKGROUND_COLOUR_ODD;
 			for(Object obj : annotationToDisplay) {
 				TextualAnnotationData data = (TextualAnnotationData) obj;
