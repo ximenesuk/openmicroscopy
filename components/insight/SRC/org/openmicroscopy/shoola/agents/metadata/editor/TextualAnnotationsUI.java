@@ -2,7 +2,7 @@
  * org.openmicroscopy.shoola.agents.metadata.editor.TextualAnnotationsUI 
  *
  *------------------------------------------------------------------------------
- *  Copyright (C) 2006-2008 University of Dundee. All rights reserved.
+ *  Copyright (C) 2006-2014 University of Dundee. All rights reserved.
  *
  *
  * 	This program is free software; you can redistribute it and/or modify
@@ -34,19 +34,18 @@ import java.awt.event.ActionListener;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import javax.swing.BorderFactory;
-import javax.swing.BoxLayout;
 import javax.swing.JButton;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
 //Third-party libraries
-//import info.clearthought.layout.TableLayout; 
+import org.apache.commons.lang.StringUtils;
+import org.apache.commons.collections.CollectionUtils;
 
 //Application-internal dependencies
 import org.openmicroscopy.shoola.util.ui.UIUtilities;
@@ -54,6 +53,8 @@ import org.openmicroscopy.shoola.util.ui.border.SeparatorOneLineBorder;
 import org.openmicroscopy.shoola.util.ui.omeeditpane.OMEWikiComponent;
 import pojos.AnnotationData;
 import pojos.TextualAnnotationData;
+import org.openmicroscopy.shoola.agents.metadata.IconManager;
+import org.openmicroscopy.shoola.agents.metadata.util.DataToSave;
 
 
 /** 
@@ -73,21 +74,15 @@ class TextualAnnotationsUI
 	extends AnnotationUI
 	implements ActionListener, DocumentListener, FocusListener
 {
-    
-	/** The length of the text before hiding the comment. */
-	private static final int	MAX_LENGTH_TEXT = 200;
 	
 	/** The default description. */
-    private static final String	DEFAULT_TEXT_COMMENT = "Comments";
-    
+	private static final String	DEFAULT_TEXT_COMMENT = "Add comment";
+        
 	/** The title associated to this component. */
 	private static final String TITLE = "Comments ";
 	
-	/** Action id to hide the previous comments. */
-	private static final int	HIDE = 2;
-	
-	/** Action id to show the previous comments. */
-	private static final int	MORE = 3;
+	/** Action id to save the comment */
+	private static final int ADD_COMMENT = 4;
 	
 	/** Reference to the control. */
 	private EditorControl 		controller;
@@ -97,30 +92,9 @@ class TextualAnnotationsUI
 	 * the currently logged in user if any. 
 	 */
 	private OMEWikiComponent	commentArea;
-	
-	/** Display the other comments. */
-	private JPanel				moreComponent;
-	
-	/** Hide the other comments. */
-	private JPanel				hideComponent;
-	
-	/** Display comments between the first and last comments. */
-	private JButton				inBetweenComponent;
 
 	/** The text set in the {@link #commentArea}. */
 	private String				originalText;
-	
-	/** Component hosting the previous comments. */
-	private JScrollPane			previousComments;
-	
-	/** Flag indicating to build the UI once. */
-	private boolean 			init;
-	
-	/** Flag indicating that the comments added by other users are visible. */
-	private boolean				expanded;
-	
-	/** Flag indicating that the latest comment was displayed or not. */
-	private boolean				partial;
 	
 	/** The constraints used to lay out the components. */
 	private GridBagConstraints constraints;
@@ -134,112 +108,17 @@ class TextualAnnotationsUI
 	/** The collection of annotations to remove.*/
 	private List annotationToRemove;
 	
-	/**
-	 * Builds and lays out the component hosting all previous annotations.
-	 * 
-	 * @return See above.
-	 */
-	private JPanel displayAllPreviousComments()
-	{
-		JPanel p = new JPanel();
-		p.setBackground(UIUtilities.BACKGROUND_COLOR);
-		p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
-		List list = annotationToDisplay;
-		if (list != null) {
-			Iterator i = list.iterator();
-			TextualAnnotationData data;
-			TextualAnnotationComponent comp;
-			int index = 0;
-			while (i.hasNext()) {
-				data = (TextualAnnotationData) i.next();
-				comp = new TextualAnnotationComponent(model, data);
-				comp.addPropertyChangeListener(controller);
-				if (index%2 == 0) 
-					comp.setAreaColor(UIUtilities.BACKGROUND_COLOUR_EVEN);
-				else comp.setAreaColor(UIUtilities.BACKGROUND_COLOUR_ODD);
-				p.add(comp);
-				index++;
-			}
-		}
-		return p;
-	}
+	/** Scrollpane hosting the comment text field */
+	private JScrollPane pane;
 	
-	/** 
-	 * Builds and lays out the component hosting the first and last previous 
-	 * annotations.
-	 * 
-	 * @return See above.
-	 */
-	private JPanel displayPartialPreviousComments()
-	{
-		JPanel p = new JPanel();
-		p.setBackground(UIUtilities.BACKGROUND_COLOR);
-		p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
-		List list = annotationToDisplay;
-		if (list == null || list.size() == 0) return p;
-		
-		//at least one.
-		TextualAnnotationData data = (TextualAnnotationData) list.get(0);
-		TextualAnnotationComponent 
-			comp = new TextualAnnotationComponent(model, data);
-		comp.addPropertyChangeListener(controller);
-		comp.setAreaColor(UIUtilities.BACKGROUND_COLOUR_EVEN);
-		p.add(comp);
-		
-		int n = list.size();
-		if (n == 1) return p;
-		Color c = UIUtilities.BACKGROUND_COLOUR_ODD;
-		if (n > 2) {
-			JPanel lp = UIUtilities.buildComponentPanel(inBetweenComponent, 0, 
-					0);
-			inBetweenComponent.setBackground(UIUtilities.BACKGROUND_COLOUR_ODD);
-			lp.setBackground(UIUtilities.BACKGROUND_COLOUR_ODD);
-			p.add(lp);
-			c = UIUtilities.BACKGROUND_COLOUR_EVEN;
-		}
-		data = (TextualAnnotationData) list.get(n-1);
-		comp = new TextualAnnotationComponent(model, data);
-		comp.addPropertyChangeListener(controller);
-		comp.setAreaColor(c);
-		p.add(comp);
-		return p;
-	}
+	/** The add comment button */
+	private JButton addButton;
 
 	/** Initializes the components. */
 	private void initComponents()
 	{
 		set = false;
-		JButton moreButton = new JButton("more");
-		moreButton.setBorder(null);
-		UIUtilities.unifiedButtonLookAndFeel(moreButton);
-		moreButton.setBackground(UIUtilities.BACKGROUND_COLOR);
-		moreButton.setForeground(UIUtilities.HYPERLINK_COLOR);
-		moreButton.setToolTipText("Display previous comments.");
-		moreButton.addActionListener(this);
-		moreButton.setActionCommand(""+MORE);
-		moreComponent = UIUtilities.buildComponentPanel(moreButton, 0, 0);
-		moreComponent.setBackground(UIUtilities.BACKGROUND_COLOR);
 
-		JButton hideButton = new JButton("less");
-		UIUtilities.unifiedButtonLookAndFeel(hideButton);
-		hideButton.setBorder(null);
-		hideButton.setBackground(UIUtilities.BACKGROUND_COLOR);
-		hideButton.setForeground(UIUtilities.HYPERLINK_COLOR);
-		hideButton.setToolTipText("Hide previous comments.");
-		hideButton.addActionListener(this);
-		hideButton.setActionCommand(""+HIDE);
-		hideComponent = UIUtilities.buildComponentPanel(hideButton, 0, 0);
-		hideComponent.setBackground(UIUtilities.BACKGROUND_COLOR);
-		
-		inBetweenComponent = new JButton("...");
-		UIUtilities.unifiedButtonLookAndFeel(inBetweenComponent);
-		inBetweenComponent.setBorder(null);
-		inBetweenComponent.setBackground(UIUtilities.BACKGROUND_COLOR);
-		inBetweenComponent.setForeground(UIUtilities.HYPERLINK_COLOR);
-		inBetweenComponent.setToolTipText("Display all comments.");
-		inBetweenComponent.addActionListener(this);
-		inBetweenComponent.setActionCommand(""+MORE);
-		
 		commentArea = new OMEWikiComponent(false);
 		commentArea.setBorder(BorderFactory.createEmptyBorder(0, 5, 0, 5));
 		commentArea.addPropertyChangeListener(controller);
@@ -249,11 +128,31 @@ class TextualAnnotationsUI
 		//commentArea.setBackground(UIUtilities.BACKGROUND_COLOR);
 		commentArea.setForeground(UIUtilities.DEFAULT_FONT_COLOR);
 		commentArea.setComponentBorder(EDIT_BORDER);
+		commentArea.addFocusListener(new FocusListener() {
+                    
+                    public void focusLost(FocusEvent arg0) {
+                        if(StringUtils.isEmpty(commentArea.getText()) || commentArea.getText().equals(DEFAULT_TEXT_COMMENT)) {
+                            pane.getViewport().setPreferredSize(null);
+                            pane.revalidate();
+                            addButton.setVisible(false);
+                        }
+                    }
+                    
+                    public void focusGained(FocusEvent arg0) {
+                        Dimension d = pane.getPreferredSize();
+                        pane.getViewport().setPreferredSize(new Dimension(d.width, 60));
+                        pane.revalidate();
+                        addButton.setVisible(true);
+                    }
+                });
 		
-		previousComments = new JScrollPane();
-		previousComments.setBorder(null);
 		setBorder(new SeparatorOneLineBorder());
 		setBackground(UIUtilities.BACKGROUND_COLOR);
+		
+		addButton = new JButton(IconManager.getInstance().getIcon(IconManager.SAVE));
+		formatButton(addButton, DEFAULT_TEXT_COMMENT, ADD_COMMENT);
+		addButton.setVisible(false);
+        addButton.setEnabled(false);
 	}
 	
 	/**
@@ -275,69 +174,40 @@ class TextualAnnotationsUI
 	private void buildGUI()
 	{
 		removeAll();
-    	if (!model.isAnnotationLoaded()) return;
-		JScrollPane pane = new JScrollPane(commentArea);
-		Dimension d = pane.getPreferredSize();
-		pane.getViewport().setPreferredSize(new Dimension(d.width, 60));
-    	pane.setBorder(null);
-    	JLabel l = new JLabel();
-    	
-		//Font f = l.getFont();
-		//l = UIUtilities.setTextFont("", Font.BOLD, f.getSize()-1);
-		l.setBorder(BorderFactory.createEmptyBorder(2, 5, 0, 5));
-		setLayout(new GridBagLayout());
-		constraints = new GridBagConstraints();
-		constraints.fill = GridBagConstraints.HORIZONTAL;
-		constraints.anchor = GridBagConstraints.NORTHWEST;
-		constraints.insets = new Insets(0, 2, 2, 0);
-		constraints.gridy = 0;
-		constraints.gridwidth = GridBagConstraints.RELATIVE; //next-to-last
-		constraints.weightx = 1.0;  
-		add(l, constraints);
-		constraints.gridy++;
-		add(pane, constraints);
-	}
-
-	/** Hides the previous comments. */
-	private void hidePreviousComments()
-	{
-		List l = annotationToDisplay;
-		if (partial) {
-			if (l != null && l.size() > 2) {
-				remove(hideComponent);
-				constraints.gridy = 2;
-				add(moreComponent, constraints);
-			}
-			constraints.gridy = 3;
-			previousComments.getViewport().add(
-					displayPartialPreviousComments());
-			add(previousComments, constraints);
-		} else {
-			remove(hideComponent);
-			constraints.gridy = 2;
-			add(moreComponent, constraints);
-			previousComments.getViewport().removeAll();
-		}
 		
-		revalidate();
-		repaint();
-	}
-	
-	/** Lays out the node. */
-	private void layoutPreviousComments()
-	{
-		List l = annotationToDisplay;
-		int n = 3;
-		if (!partial) n = 1;
-		if (l != null && l.size() >= n) {
-			remove(moreComponent);
-			constraints.gridy = 2;
-			add(hideComponent, constraints);
-		}
-		previousComments.getViewport().removeAll();
-		previousComments.getViewport().add(displayAllPreviousComments());
-		revalidate();
-		repaint();
+    	if (!model.isAnnotationLoaded()) 
+    		return;
+    	
+		pane = new JScrollPane(commentArea);
+		pane.getViewport().setPreferredSize(null);
+    	pane.setBorder(null);
+    	
+		setLayout(new GridBagLayout());
+		
+		constraints = new GridBagConstraints();
+		constraints.insets = new Insets(2, 0, 2, 0);
+		constraints.fill = GridBagConstraints.BOTH;
+		constraints.anchor = GridBagConstraints.NORTHWEST;
+		constraints.gridx = 0;
+		constraints.gridy = 0;
+		constraints.weightx = 1; 
+		constraints.weighty = 1; 
+		add(pane, constraints);
+		
+		constraints.gridx = 1;
+		constraints.weightx = 0;
+		constraints.weighty = 0; 
+		constraints.fill = GridBagConstraints.NONE;
+        constraints.anchor = GridBagConstraints.SOUTH;
+        add(addButton, constraints);
+        
+        constraints.gridx = 0;
+        constraints.gridy = 1;
+        constraints.weightx = 1;
+        constraints.weighty = 0; 
+        constraints.gridwidth = 2;
+        constraints.fill = GridBagConstraints.HORIZONTAL;
+        constraints.anchor = GridBagConstraints.NORTHWEST;
 	}
 	
 	/**
@@ -348,9 +218,7 @@ class TextualAnnotationsUI
 	private void displayAnnotations(List list)
 	{
 		annotationToDisplay = list;
-		boolean hasPrevious = true;
-		if (list == null || list.size() == 0) hasPrevious = false;
-		if (!hasPrevious) {
+		if (CollectionUtils.isEmpty(list)) {
 			originalText = DEFAULT_TEXT_COMMENT;
 			setAreaText(DEFAULT_TEXT_COMMENT, true);
 		}
@@ -360,25 +228,23 @@ class TextualAnnotationsUI
 			enabled = !model.isAcrossGroups();
 		}
 		commentArea.setEnabled(enabled);
-		if (hasPrevious) {
-			TextualAnnotationData data = (TextualAnnotationData) list.get(0);
-			String text = data.getText();
-			if (!set) expanded = text.length() < MAX_LENGTH_TEXT;
-			//layout.setRow(3, TableLayout.PREFERRED);
-			constraints.gridy = 3;
-			add(previousComments, constraints);
-			if (expanded) {
-				partial = true;
-				previousComments.getViewport().add(
-						displayPartialPreviousComments());
-				if (list.size() > 2) {
-					constraints.gridy = 2;
-					add(moreComponent, constraints);
-				}
-			} else {
-				partial = false;
-				constraints.gridy = 2;
-				add(moreComponent, constraints);
+		
+		if (!CollectionUtils.isEmpty(list)) {
+			Collections.reverse(list);
+			Color c = UIUtilities.BACKGROUND_COLOUR_ODD;
+			for(Object obj : annotationToDisplay) {
+				TextualAnnotationData data = (TextualAnnotationData) obj;
+				TextualAnnotationComponent 
+					comp = new TextualAnnotationComponent(model, data);
+				comp.addPropertyChangeListener(controller);
+				comp.setAreaColor(c);
+				add(comp, constraints);
+				constraints.gridy++;
+				
+				if (c == UIUtilities.BACKGROUND_COLOUR_ODD)
+					c = UIUtilities.BACKGROUND_COLOUR_EVEN;
+				else
+					c = UIUtilities.BACKGROUND_COLOUR_ODD;
 			}
 		}
 	}
@@ -397,7 +263,6 @@ class TextualAnnotationsUI
 		this.controller = controller;
 		title = TITLE;
 		initComponents();
-		init = false; 
 	}
 	
 	/**
@@ -410,7 +275,6 @@ class TextualAnnotationsUI
 		if (annotationToRemove == null) annotationToRemove = new ArrayList();
 		annotationToRemove.clear();
 		annotationToRemove.add(annotation);
-		previousComments.getViewport().removeAll();
 		List l = model.getTextualAnnotationsByDate();
 		List toKeep = new ArrayList();
 		if (l != null) {
@@ -439,10 +303,7 @@ class TextualAnnotationsUI
 	 */
 	protected void buildUI()
 	{
-		//if (!init) {
-			buildGUI();
-			init = true;
-		//}
+		buildGUI();
 		if (model.isMultiSelection()) {
 			displayAnnotations(null);
 		} else {
@@ -517,10 +378,10 @@ class TextualAnnotationsUI
 	{
 		if (annotationToRemove != null) annotationToRemove.clear();
 		annotationToDisplay = null;
-		if (previousComments != null)
-			previousComments.getViewport().removeAll();
 		originalText = DEFAULT_TEXT_COMMENT;
 		setAreaText(DEFAULT_TEXT_COMMENT, true);
+		addButton.setEnabled(false);
+		addButton.setVisible(false);
 	}
 	
 	/**
@@ -540,16 +401,16 @@ class TextualAnnotationsUI
 	{
 		int index = Integer.parseInt(e.getActionCommand());
 		switch (index) {
-			case MORE:
-				set = true;
-				expanded = true;
-				layoutPreviousComments();
-				break;
-			case HIDE:
-				set = true;
-				expanded = false;
-				hidePreviousComments();
+			case ADD_COMMENT:
+			    saveComment();
+			    break;
 		}
+	}
+	
+	/** Saves the comment */
+	private void saveComment() {
+	    List<AnnotationData> comments = getAnnotationToSave();
+	    model.fireAnnotationSaving(new DataToSave(comments, Collections.emptyList()), null, false);
 	}
 
 	/**
@@ -558,7 +419,8 @@ class TextualAnnotationsUI
 	 */
 	public void insertUpdate(DocumentEvent e)
 	{
-		firePropertyChange(EditorControl.SAVE_PROPERTY, Boolean.FALSE, 
+	        addButton.setEnabled(hasDataToSave());
+	        firePropertyChange(EditorControl.SAVE_PROPERTY, Boolean.FALSE, 
 						Boolean.TRUE);
 	}
 
@@ -568,7 +430,8 @@ class TextualAnnotationsUI
 	 */
 	public void removeUpdate(DocumentEvent e)
 	{
-		firePropertyChange(EditorControl.SAVE_PROPERTY, Boolean.FALSE, 
+	        addButton.setEnabled(hasDataToSave());
+	        firePropertyChange(EditorControl.SAVE_PROPERTY, Boolean.FALSE, 
 							Boolean.TRUE);
 	}
 	
@@ -606,6 +469,26 @@ class TextualAnnotationsUI
 	 * in our case.
 	 * @see FocusListener#focusGained(FocusEvent)
 	 */
-	public void focusGained(FocusEvent e) {}
+	public void focusGained(FocusEvent e) {
+	}
+	
+        /**
+         * Formats the specified button.
+         * 
+         * @param button
+         *            The button to handle.
+         * @param text
+         *            The tool tip text.
+         * @param actionID
+         *            The action command id.
+         */
+        private void formatButton(JButton button, String text, int actionID) {
+            button.setOpaque(false);
+            UIUtilities.unifiedButtonLookAndFeel(button);
+            button.setBackground(UIUtilities.BACKGROUND_COLOR);
+            button.setToolTipText(text);
+            button.addActionListener(this);
+            button.setActionCommand("" + actionID);
+        }
 	
 }
