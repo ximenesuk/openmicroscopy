@@ -203,8 +203,6 @@ class UserProfile
                 passwordNew.requestFocus();
                 return;
             }
-            un = MetadataViewerAgent.getRegistry().getUserNotifier();
-            un.notifyInfo(PASSWORD_CHANGE_TITLE, "Password changed.");
             passwordNew.setText("");
             model.resetPassword(newPass);
             return;
@@ -777,15 +775,14 @@ class UserProfile
      * Builds the UI component hosting the UI component used to modify 
      * the password.
      * 
+     * @param ldap
      * @return See above.
      */
-    private JPanel buildPasswordPanel()
+    private JPanel buildPasswordPanel(String ldap)
     {
         JPanel content = new JPanel();
         content.setBackground(UIUtilities.BACKGROUND_COLOR);
-        Registry reg = MetadataViewerAgent.getRegistry();
-        String ldap = (String) reg.lookup(LookupNames.USER_AUTHENTICATION);
-        if (ldap != null && ldap.length() > 0) {
+        if (StringUtils.isNotBlank(ldap)) {
             content.setBorder(
                     BorderFactory.createTitledBorder("LDAP Authentication"));
             content.setLayout(new FlowLayout(FlowLayout.LEFT));
@@ -905,7 +902,19 @@ class UserProfile
             c.gridy++;
             add(Box.createVerticalStrut(5), c);
             c.gridy++;
-            add(buildPasswordPanel(), c);
+            String ldap = null;
+            if (model.isUserOwner(model.getRefObject())) {
+                Registry reg = MetadataViewerAgent.getRegistry();
+                ldap = (String) reg.lookup(LookupNames.USER_AUTHENTICATION);
+            } else {
+                ldap = model.getLDAPDetails();
+            }
+            if (StringUtils.isNotBlank(ldap)) {
+                loginArea.setEnabled(false);
+                loginArea.setEditable(false);
+                loginArea.getDocument().removeDocumentListener(this);
+            }
+            add(buildPasswordPanel(ldap), c);
         }
         ExperimenterData exp = (ExperimenterData) model.getRefObject();
         BufferedImage photo = model.getUserPhoto(exp.getId());
