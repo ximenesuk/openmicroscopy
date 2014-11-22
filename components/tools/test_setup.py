@@ -32,6 +32,7 @@ class PyTest(TestCommand):
          ('junitxml=', None, "create junit-xml style report file at 'path'"),
          ('pdb', None, "fallback to pdb on error"),
          ('markers', None, "list available markers'"),
+         ('runxfail=', None, "run tests marked as xfail"),
          ]
 
     def initialize_options(self):
@@ -47,6 +48,7 @@ class PyTest(TestCommand):
         self.junitxml = None
         self.pdb = False
         self.markers = False
+        self.runxfail = False
 
     def finalize_options(self):
         TestCommand.finalize_options(self)
@@ -67,6 +69,8 @@ class PyTest(TestCommand):
             self.test_args.extend(['--junitxml', self.junitxml])
         if self.pdb:
             self.test_args.extend(['--pdb'])
+        if self.runxfail:
+            self.test_args.extend(['--runxfail'])
         print self.test_failfast
         self.test_suite = True
         if self.markers:

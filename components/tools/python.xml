@@ -68,11 +68,26 @@ build_year = "${python_build_year}"
         <if>
             <isset property="MARK"/>
             <then>
-                <py_test target="${basedir}/test/integration">
-                    <optionalArgs>
-                        <arg value="-m ${MARK}"/>
-                    </optionalArgs>
-                </py_test>
+
+                <if>
+                    <isset property="runxfail"/>
+                    <then>
+                        <py_test target="${basedir}/test/integration">
+                            <optionalArgs>
+                                <arg value="-m ${MARK}"/>
+                                <arg value="--runxfail"/>
+                            </optionalArgs>
+                        </py_test>
+                    </then>
+                    <else>
+                        <py_test target="${basedir}/test/integration">
+                            <optionalArgs>
+                                <arg value="-m ${MARK}"/>
+                            </optionalArgs>
+                        </py_test>
+                    </else>
+                </if>
+
             </then>
             <else>
                 <py_test target="${basedir}/test/integration">
