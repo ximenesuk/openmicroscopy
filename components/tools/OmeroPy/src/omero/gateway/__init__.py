@@ -2754,6 +2754,10 @@ class _BlitzGateway (object):
                 leaders = [self.getUser()]
             else:
                 colleagues = [self.getUser()]
+
+        colleagues.sort(key=lambda x: x.getLastName().lower())
+        leaders.sort(key=lambda x: x.getLastName().lower())
+
         return {"leaders": leaders, "colleagues": colleagues}
 
     def listStaffs(self):
@@ -4418,6 +4422,7 @@ class AnnotationWrapper (BlitzObjectWrapper):
                 kwargs['link'] = BlitzObjectWrapper(conn, link)
             return klass.registry[obj.__class__](conn, obj, **kwargs)
         else:  # pragma: no cover
+            logger.error("Failed to _wrap() annotation: %s" % obj.__class__)
             return None
 
     @classmethod
@@ -7132,7 +7137,7 @@ class _ImageWrapper (BlitzObjectWrapper):
 
         handle = self._conn.c.sf.submit(req)
         try:
-            cb = self._conn._waitOnCmd(handle)
+            cb = self._conn._waitOnCmd(handle, failontimeout=True)
             rsp = cb.getResponse()
         finally:
             handle.close()

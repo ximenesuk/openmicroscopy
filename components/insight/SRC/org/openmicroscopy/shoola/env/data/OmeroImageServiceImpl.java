@@ -2,7 +2,7 @@
  * org.openmicroscopy.shoola.env.data.OmeroImageServiceImpl
  *
  *------------------------------------------------------------------------------
- *  Copyright (C) 2006-2014 University of Dundee. All rights reserved.
+ *  Copyright (C) 2006-2015 University of Dundee. All rights reserved.
  *
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -40,12 +40,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Map.Entry;
+
 import javax.imageio.ImageIO;
 import javax.swing.filechooser.FileFilter;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.stream.StreamResult;
 import javax.xml.transform.stream.StreamSource;
+
 
 //Third-party libraries
 import loci.common.RandomAccessInputStream;
@@ -54,6 +56,7 @@ import loci.formats.tiff.TiffParser;
 import loci.formats.tiff.TiffSaver;
 
 import com.sun.opengl.util.texture.TextureData;
+
 
 //Application-internal dependencies
 import ome.formats.importer.ImportCandidates;
@@ -82,6 +85,7 @@ import org.apache.commons.lang.RandomStringUtils;
 import org.openmicroscopy.shoola.env.LookupNames;
 import org.openmicroscopy.shoola.env.config.Registry;
 import org.openmicroscopy.shoola.env.data.login.UserCredentials;
+import org.openmicroscopy.shoola.env.data.model.FileObject;
 import org.openmicroscopy.shoola.env.data.model.ImportableFile;
 import org.openmicroscopy.shoola.env.data.model.ImportableObject;
 import org.openmicroscopy.shoola.env.data.model.MovieExportParam;
@@ -104,6 +108,7 @@ import org.openmicroscopy.shoola.util.filter.file.OMETIFFFilter;
 import org.openmicroscopy.shoola.util.filter.file.XMLFilter;
 import org.openmicroscopy.shoola.util.image.geom.Factory;
 import org.openmicroscopy.shoola.util.image.io.WriterImage;
+
 import pojos.ChannelData;
 import pojos.DataObject;
 import pojos.DatasetData;
@@ -233,7 +238,8 @@ class OmeroImageServiceImpl
 							label.setCallback(gateway.importImageFile(ctx,
 									object, ioContainer, importIc,
 									label, toClose,
-									ImportableObject.isHCSFile(file),
+									ImportableObject.isHCSFile(
+									        file.getAbsolutePath()),
 									userName));
 						}
 					}
@@ -511,15 +517,17 @@ class OmeroImageServiceImpl
 
 	/** 
 	 * Implemented as specified by {@link OmeroImageService}. 
-	 * @see OmeroImageService#renderImage(SecurityContext, long, PlaneDef, boolean, boolean)
+	 * @see OmeroImageService#renderImage(SecurityContext, long, PlaneDef,
+	 * boolean, boolean, int)
 	 */
 	public Object renderImage(SecurityContext ctx, long pixelsID, PlaneDef pDef,
-		boolean asTexture, boolean largeImage)
+		boolean asTexture, boolean largeImage, int compression)
 		throws RenderingServiceException
 	{
 		try {
 			return PixelsServicesFactory.render(context, ctx,
-						Long.valueOf(pixelsID), pDef, asTexture, largeImage);
+						Long.valueOf(pixelsID), pDef, asTexture, largeImage,
+						compression);
 		} catch (Exception e) {
 			throw new RenderingServiceException("RenderImage", e);
 		}
@@ -1027,7 +1035,7 @@ class OmeroImageServiceImpl
 		//prepare the container.
 		List<String> candidates;
 		ImportCandidates ic = null;
-		File file = importable.getFile();
+		File file = importable.getFile().getFileToImport();
 		DatasetData dataset = importable.getDataset();
 		DataObject container = importable.getParent();
 		IObject ioContainer = null;
@@ -1040,7 +1048,7 @@ class OmeroImageServiceImpl
 		ImportContainer importIc;
 		List<ImportContainer> icContainers;
 		if (file.isFile()) {
-			hcsFile = ImportableObject.isHCSFile(file);
+			hcsFile = ImportableObject.isHCSFile(importable.getFile());
 			//Create the container if required.
 			if (hcsFile) {
 				boolean b = ImportableObject.isArbitraryFile(file);
@@ -1166,7 +1174,7 @@ class OmeroImageServiceImpl
 						return Boolean.valueOf(false);
 					return gateway.importImageFile(ctx, object, ioContainer,
 							importIc, status, close,
-							ImportableObject.isHCSFile(f),userName);
+							ImportableObject.isHCSFile(f.getAbsolutePath()),userName);
 				} else {
 					List<ImportContainer> containers = ic.getContainers();
 					hcs = isHCS(containers);
@@ -1178,7 +1186,7 @@ class OmeroImageServiceImpl
 					File f;
 					while (i.hasNext()) {
 					    f = new File(i.next());
-						label = new StatusLabel(f);
+						label = new StatusLabel(new FileObject(f));
 						label.setUsedFiles(containers.get(index).getUsedFiles());
 						files.put(f, label);
 						index++;
@@ -1211,7 +1219,8 @@ class OmeroImageServiceImpl
 					return Boolean.valueOf(false);
 				return gateway.importImageFile(ctx, object, ioContainer,
 						importIc,
-					status, close, ImportableObject.isHCSFile(file), userName);
+					status, close, ImportableObject.isHCSFile(
+					        file.getAbsolutePath()), userName);
 			}
 		} //file import ends.
 		//Checks folder import.
@@ -1241,7 +1250,7 @@ class OmeroImageServiceImpl
 			c = j.next();
 			hcs = c.getIsSPW();
 			f = c.getFile();
-			sl = new StatusLabel(f);
+			sl = new StatusLabel(new FileObject(f));
 			sl.setUsedFiles(c.getUsedFiles());
 			if (hcs) {
 				if (n == 1 && file.list().length > 1)

@@ -2,7 +2,7 @@
  * org.openmicroscopy.shoola.agents.metadata.rnd.RendererComponent 
  *
  *------------------------------------------------------------------------------
- *  Copyright (C) 2006-2014 University of Dundee. All rights reserved.
+ *  Copyright (C) 2006-2015 University of Dundee. All rights reserved.
  *
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -25,22 +25,19 @@ package org.openmicroscopy.shoola.agents.metadata.rnd;
 
 //Java imports
 import java.awt.Color;
-import java.awt.Component;
 import java.awt.Dimension;
-import java.awt.Point;
 import java.awt.image.BufferedImage;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-
-import javax.swing.Action;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
 
+
 //Third-party libraries
 import com.sun.opengl.util.texture.TextureData;
+
 
 //Application-internal dependencies
 import omero.romio.PlaneDef;
@@ -51,8 +48,8 @@ import org.openmicroscopy.shoola.agents.events.iviewer.ViewImageObject;
 import org.openmicroscopy.shoola.agents.metadata.MetadataViewerAgent;
 import org.openmicroscopy.shoola.agents.metadata.view.MetadataViewer;
 import org.openmicroscopy.shoola.agents.util.ViewedByItem;
+import org.openmicroscopy.shoola.env.LookupNames;
 import org.openmicroscopy.shoola.env.data.DSOutOfServiceException;
-import org.openmicroscopy.shoola.env.data.OmeroImageService;
 import org.openmicroscopy.shoola.env.data.events.ViewInPluginEvent;
 import org.openmicroscopy.shoola.env.event.EventBus;
 import org.openmicroscopy.shoola.env.log.LogMessage;
@@ -65,6 +62,7 @@ import org.openmicroscopy.shoola.env.ui.UserNotifier;
 import org.openmicroscopy.shoola.util.file.modulo.ModuloInfo;
 import org.openmicroscopy.shoola.util.ui.MessageBox;
 import org.openmicroscopy.shoola.util.ui.component.AbstractComponent;
+
 import pojos.ChannelData;
 import pojos.ImageData;
 import pojos.PixelsData;
@@ -1031,6 +1029,21 @@ class RendererComponent
 	}
 
 	/** 
+	 * Implemented as specified by the {@link Renderer} interface.
+	 * @see Renderer#renderPlane(PlaneDef, int )
+	 */
+	public BufferedImage renderPlane(PlaneDef pDef, int compression)
+	{
+	    if (pDef == null) return null;
+	    try {
+	        return model.render(pDef, compression);
+	    } catch (Throwable e) {
+	        handleException(e, false);
+	    }
+	    return null;
+	}
+
+	/** 
      * Implemented as specified by the {@link Renderer} interface.
      * @see Renderer#renderPlane(PlaneDef)
      */
@@ -1059,7 +1072,7 @@ class RendererComponent
 		}
 		return null;
 	}
-	
+
 	/** 
      * Implemented as specified by the {@link Renderer} interface.
      * @see Renderer#setRangeAllChannels(boolean)
@@ -1258,9 +1271,9 @@ class RendererComponent
 		ImageData image = model.getRefImage();
 		if (image == null) return;
 		EventBus bus = MetadataViewerAgent.getRegistry().getEventBus();
-		if (MetadataViewerAgent.runAsPlugin() == MetadataViewer.IMAGE_J) {
+		if (MetadataViewerAgent.runAsPlugin() == LookupNames.IMAGE_J) {
 			bus.post(new ViewInPluginEvent(model.getSecurityContext(),
-					image, MetadataViewer.IMAGE_J));
+					image, LookupNames.IMAGE_J));
 		} else {
 			bus.post(new ViewImage(model.getSecurityContext(),
 					new ViewImageObject(image), null));

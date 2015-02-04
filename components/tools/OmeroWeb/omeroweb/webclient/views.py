@@ -39,6 +39,8 @@ from omero_version import omero_version
 import omero, omero.scripts
 from omero.rtypes import wrap, unwrap
 
+from omero.gateway.utils import toBoolean
+
 from django.conf import settings
 from django.template import loader as template_loader
 from django.http import Http404, HttpResponse, HttpResponseRedirect, HttpResponseServerError
@@ -69,7 +71,7 @@ from controller.search import BaseSearch
 from controller.share import BaseShare
 
 from omeroweb.webadmin.forms import LoginForm
-from omeroweb.webadmin.webadmin_utils import toBoolean, upgradeCheck
+from omeroweb.webadmin.webadmin_utils import upgradeCheck
 
 from omeroweb.webgateway import views as webgateway_views
 
@@ -130,8 +132,13 @@ def login(request):
                 userGroupId = conn.getAdminService().getSecurityRoles().userGroupId
                 if userGroupId in conn.getEventContext().memberOfGroups:
                     request.session['connector'] = connector
-                    upgradeCheck()
-
+                    # UpgradeCheck URL should be loaded from the server or loaded
+                    # omero.web.upgrades.url allows to customize web only
+                    try:
+                        upgrades_url = settings.UPGRADES_URL
+                    except:
+                        upgrades_url = conn.getUpgradesUrl()
+                    upgradeCheck(url=upgrades_url)
                     # if 'active_group' remains in session from previous login, check it's valid for this user
                     if request.session.get('active_group'):
                         if request.session.get('active_group') not in conn.getEventContext().memberOfGroups:
@@ -986,7 +993,7 @@ def load_metadata_acquisition(request, c_type, c_id, conn=None, share_id=None, *
         if c_type == "well":
             manager.image = manager.well.getImage(index)
         if share_id is None:
-            manager.originalMetadata()
+            manager.companionFiles()
         manager.channelMetadata()
         for theC, ch in enumerate(manager.channel_metadata):
             logicalChannel = ch.getLogicalChannel()
@@ -1132,6 +1139,27 @@ def load_metadata_acquisition(request, c_type, c_id, conn=None, share_id=None, *
     return context
 
 
+@login_required()
+@render_response()
+def load_original_metadata(request, imageId, conn=None, **kwargs):
+
+    image = conn.getObject("Image", imageId)
+    if image is None:
+        raise Http404("No Image found with ID %s" % imageId)
+
+    context = {'template': 'webclient/annotations/original_metadata.html',
+                'imageId': image.getId()}
+    try:
+        om = image.loadOriginalMetadata()
+        if om is not None:
+            context['original_metadata'] = om[0]
+            context['global_metadata'] = om[1]
+            context['series_metadata'] = om[2]
+    except omero.LockTimeout, ex:
+        # 408 is Request Timeout
+        return HttpResponse(content='LockTimeout', status=408)
+    return context
+
 ###########################################################################
 # ACTIONS
 
@@ -1193,6 +1221,14 @@ def batch_annotate(request, conn=None, **kwargs):
 
     manager = BaseContainer(conn)
     batchAnns = manager.loadBatchAnnotations(objs)
+    # get average values for User ratings and Other ratings.
+    r = [r['ann'].getLongValue() for r in batchAnns['UserRatings']]
+    userRatingAvg = r and sum(r) / len(r) or 0
+    # get all ratings and summarise
+    allratings = [a['ann'] for a in batchAnns['UserRatings']]
+    allratings.extend([a['ann'] for a in batchAnns['OtherRatings']])
+    ratings = manager.getGroupedRatings(allratings)
+
     figScripts = manager.listFigureScripts(objs)
     filesetInfo = None
     iids = []
@@ -1223,7 +1259,7 @@ def batch_annotate(request, conn=None, **kwargs):
     context = {'form_comment':form_comment, 'obj_string':obj_string, 'link_string': link_string,
             'obj_labels': obj_labels, 'batchAnns': batchAnns, 'batch_ann':True, 'index': index,
             'figScripts':figScripts, 'filesetInfo': filesetInfo, 'annotationBlocked': annotationBlocked,
-            'differentGroups':False}
+            'userRatingAvg': userRatingAvg, 'ratings': ratings, 'differentGroups':False}
     if len(groupIds) > 1:
         context['annotationBlocked'] = "Can't add annotations because objects are in different groups"
         context['differentGroups'] = True       # E.g. don't run scripts etc
@@ -1323,6 +1359,31 @@ def annotate_file(request, conn=None, **kwargs):
         template = "webclient/annotations/files_form.html"
     context['template'] = template
     return context
+
+
+@login_required()
+@render_response()
+def annotate_rating(request, conn=None, **kwargs):
+    """
+    Handle adding Rating to one or more objects
+    """
+    index = getIntOrDefault(request, 'index', 0)
+    rating = getIntOrDefault(request, 'rating', 0)
+    oids = getObjects(request, conn)
+
+    # add / update rating
+    for otype, objs in oids.items():
+        for o in objs:
+            o.setRating(rating)
+
+    # return a summary of ratings
+    manager = BaseContainer(conn)
+    batchAnns = manager.loadBatchAnnotations(oids)
+    allratings = [a['ann'] for a in batchAnns['UserRatings']]
+    allratings.extend([a['ann'] for a in batchAnns['OtherRatings']])
+    ratings = manager.getGroupedRatings(allratings)
+    return ratings
+
 
 @login_required()
 @render_response()
@@ -2510,12 +2571,15 @@ def list_scripts (request, conn=None, **kwargs):
 
     # group scripts into 'folders' (path), named by parent folder name
     scriptMenu = {}
+    scripts_to_ignore = conn.getConfigService() \
+                        .getConfigValue("omero.client.scripts_to_ignore") \
+                        .split(",")
     for s in scripts:
         scriptId = s.id.val
         path = s.path.val
         name = s.name.val
         fullpath = os.path.join(path, name)
-        if fullpath in settings.SCRIPTS_TO_IGNORE:
+        if fullpath in scripts_to_ignore:
             logger.info('Ignoring script %r' % fullpath)
             continue
 
