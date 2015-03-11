@@ -264,6 +264,17 @@ class FsControl(CmdControl):
             "--check", action="store_true",
             help="checks each fileset for validity (admins only)")
 
+        img = parser.add(sub, self.img)
+        img.add_style_argument()
+        img.add_argument(
+            "--wait", type=long,
+            help="Number of seconds to wait for the processing to complete "
+            "(Indefinite < 0; No wait=0).", default=-1)
+        img.add_argument(
+            "image",
+            type=ProxyStringType("Image"),
+            help="Image to be queried: ID or Image:ID")
+
         usage = parser.add(sub, self.usage)
         usage.set_args_unsorted()
         usage.add_login_arguments()
@@ -701,6 +712,41 @@ Examples:
         for idx, pair in enumerate(repos):
             if MRepo.checkedCast(pair[1]):
                 return pair
+
+    def img(self, args):
+        """List files that comprise an image.
+
+Examples:
+
+    bin/omero fs img id           # Show files of image id
+
+        """
+
+        import re
+        from omero.cmd import UsedFilesRequest
+
+        client = self.ctx.conn(args)
+        iid = args.image.id.val
+        req = UsedFilesRequest(imageId=iid)
+
+        cb = None
+        try:
+            rsp, status, cb = self.response(client, req, wait=args.wait)
+        finally:
+            if cb is not None:
+                cb.close(True)  # Close handle
+
+        err = self.get_error(rsp)
+        if err:
+            self.ctx.err("Error: " + rsp.parameters['message'])
+        else:
+            tb = self._table(args)
+            tb.cols(["ids"])
+            for k in sorted(vars(rsp).keys()):
+                ids = sorted(rsp.__dict__[k])
+                k = re.sub("([a-z])([A-Z])","\g<1> \g<2>", k).lower()
+                tb.row(k, ','.join(str(i) for i in ids))
+            self.ctx.out(str(tb.build()))
 
     def usage(self, args):
         """Shows the disk usage for various objects.
