@@ -4,7 +4,7 @@
 """
    Integration test for search testing
 
-   Copyright 2010-2014 Glencoe Software, Inc. All rights reserved.
+   Copyright 2010-2015 Glencoe Software, Inc. All rights reserved.
    Use is subject to license terms supplied in LICENSE.txt
 
 """
@@ -359,32 +359,36 @@ class TestSearch(lib.ITest):
         finally:
             search.close()
 
+    @pytest.fixture(params=["very-small", "very_small", "very small"])
+    def fixture_hyphen_underscore(self, request):
+        client = self.new_client()
+        proj = self.make_project(request.param, client=client)
+        self.root.sf.getUpdateService().indexObject(proj)
+
+        search = client.sf.createSearchService()
+
+        return search, proj.id.val
+
+    @pytest.mark.flaky(reruns=9, pause=100, fixture_once=True)
     @pytest.mark.parametrize("test", (
         "very small", "very-small", "very_small",
         "small very",
         # TODO: "small-very", "small_very", <-- these do NOT work
     ))
-    @pytest.mark.parametrize("name", (
-        "very-small", "very_small", "very small",
-    ))
-    def test_hyphen_underscore(self, name, test):
-        client = self.new_client()
-        proj = self.make_project(name, client=client)
-        self.root.sf.getUpdateService().indexObject(proj)
-
-        search = client.sf.createSearchService()
+    def test_hyphen_underscore(self, test, fixture_hyphen_underscore):
+        search, proj_id = fixture_hyphen_underscore
         search.onlyType("Project")
-
         try:
             search.byLuceneQueryBuilder("", "", "", "", test)
             assert search.hasNext()
-            assert proj.id.val in [
+            assert proj_id in [
                 x.id.val for x in search.results()
             ]
         finally:
             search.close()
 
-    def test_map_annotations(self):
+    @pytest.fixture
+    def fixture_map_annotations(self):
         client = self.new_client()
         key = "k" + self.simple_uuid()
         val = "v" + self.simple_uuid()
@@ -398,6 +402,11 @@ class TestSearch(lib.ITest):
         self.root.sf.getUpdateService().indexObject(proj)
 
         search = client.sf.createSearchService()
+        return search, key, val, proj.id.val
+
+    @pytest.mark.flaky(reruns=9, pause=100, fixture_once=True)
+    def test_map_annotations(self, fixture_map_annotations):
+        search, key, val, proj_id = fixture_map_annotations
         search.onlyType("Project")
 
         try:
@@ -406,7 +415,7 @@ class TestSearch(lib.ITest):
                         "has_key:%s" % key):
                 search.byFullText(txt)
                 assert search.hasNext(), txt
-                assert proj.id.val in [
+                assert proj_id in [
                     x.id.val for x in search.results()
                 ], txt
 
