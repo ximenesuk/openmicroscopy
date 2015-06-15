@@ -2265,6 +2265,7 @@ def _annotations(request, objtype, objid, conn=None, **kwargs):
     query += """
         left outer join fetch obj0.annotationLinks links
         left outer join fetch links.child
+        join fetch links.details.creationEvent
         where obj%d.id=:id""" % (len(objtype) - 1)
 
     ctx = conn.createServiceOptsDict()
@@ -2290,8 +2291,11 @@ def _annotations(request, objtype, objid, conn=None, **kwargs):
         addedBy = link.details.owner
         data.append(dict(id=annotation.id.val,
                          file=annotation.file.id.val,
+                         parentType=objtype[0],
+                         parentId=obj.id.val,
                          owner="%s %s" % (unwrap(owner.firstName), unwrap(owner.lastName)),
-                         addedBy="%s %s" % (unwrap(addedBy.firstName), unwrap(addedBy.lastName))))
+                         addedBy="%s %s" % (unwrap(addedBy.firstName), unwrap(addedBy.lastName)),
+                         addedOn=unwrap(link.details.creationEvent._time)))
     return dict(data=data)
 
 
@@ -2406,4 +2410,7 @@ def object_table_query(request, objtype, objid, conn=None, **kwargs):
     tableData['annId'] = ann['id']
     tableData['owner'] = ann['owner']
     tableData['addedBy'] = ann['addedBy']
+    tableData['parentType'] = ann['parentType']
+    tableData['parentId'] = ann['parentId']
+    tableData['addedOn'] = ann['addedOn']
     return tableData
