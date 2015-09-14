@@ -562,13 +562,13 @@ class TestImport(CLITest):
         assert obj
 
     target_fixtures = [
-        ("Dataset", "test.fake", '-d'),
-        ("Screen",
+        ("Dataset", "Image", "test.fake", '-d'),
+        ("Screen", "Plate",
          "SPW&plates=1&plateRows=1&plateCols=1&fields=1&plateAcqs=1.fake",
          "-r")]
 
-    @pytest.mark.parametrize("container,filename,arg", target_fixtures)
-    def testTargetInDifferentGroup(self, container, filename, arg,
+    @pytest.mark.parametrize("container,objtype,filename,arg", target_fixtures)
+    def testTargetInDifferentGroup(self, container, objtype, filename, arg,
                                    tmpdir, capfd):
         """
         The workflow this test exercises is currently broken. Until
@@ -584,22 +584,26 @@ class TestImport(CLITest):
             target, {"omero.group": str(new_group.id.val)})
         assert target.details.group.id.val == new_group.id.val
 
+        # Switch group to that of the target
+        self.args = ["sessions", "group", new_group.name.val]
+        self.cli.invoke(self.args, strict=True)
+
         fakefile = tmpdir.join(filename)
         fakefile.write('')
+        self.args = ["import"]
+        self.add_client_dir()
         self.args += [str(fakefile)]
         self.args += [arg, '%s' % target.id.val]
 
         # Invoke CLI import command and retrieve stdout/stderr
-        with pytest.raises(NonZeroReturnCode):
-            self.cli.invoke(self.args, strict=True)
+        self.cli.invoke(self.args, strict=True)
 
-        # o, e = capfd.readouterr()
-        # obj = self.get_object(e, 'Image')
+        o, e = capfd.readouterr()
+        obj = self.get_object(e, objtype)
+        assert obj.details.group.id.val == new_group.id.val
 
-        # assert obj.details.id.val == new_group.id.val
-
-    @pytest.mark.parametrize("container,filename,arg", target_fixtures)
-    def testUnknownTarget(self, container, filename, arg, tmpdir):
+    @pytest.mark.parametrize("container,obj,filename,arg", target_fixtures)
+    def testUnknownTarget(self, container, obj, filename, arg, tmpdir):
         target = eval("omero.model."+container+"I")()
         target.name = rstring('testUnknownTarget')
         target = self.update.saveAndReturnObject(target)
