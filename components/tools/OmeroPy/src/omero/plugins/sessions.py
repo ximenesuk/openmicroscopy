@@ -193,9 +193,14 @@ class SessionsControl(BaseControl):
         parser.add(sub, self.help, "Extended help")
         login = parser.add(
             sub, self.login, self.login.__doc__)
+        self._configure_login(login)
+
         logout = parser.add(
             sub, self.logout, "Logout and remove current session key")
-        self._configure_login(login)
+        logout.add_argument(
+            "-k", "--key",
+            help="Logout and remove specific session key"
+            " (UUID of an active session)")
 
         group = parser.add(
             sub, self.group,
@@ -567,6 +572,10 @@ class SessionsControl(BaseControl):
     def logout(self, args):
         store = self.store(args)
         previous = store.get_current()
+
+        if args.key:
+            previous = list(previous)
+            previous[2] = args.key
 
         try:
             rv = store.attach(*previous[:-1])

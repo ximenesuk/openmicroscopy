@@ -694,7 +694,7 @@ class MonitorClientI(monitors.MonitorClient):
                     self.log.error("%s not found !" % t)
                 self.log.error("***** end of output from importer-cli *****")
         finally:
-            self.logoutUser(sess)
+            #self.logoutUser(sess)
             remove_path(t)
             remove_path(to)
 
