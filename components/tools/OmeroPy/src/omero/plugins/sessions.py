@@ -576,11 +576,13 @@ class SessionsControl(BaseControl):
         if args.key:
             previous = list(previous)
             previous[2] = args.key
+        print "Previous session: " + str(previous)
 
         try:
             rv = store.attach(*previous[:-1])
             rv[0].killSession()
         except Exception, e:
+            print "Exception on logout: %s" % e
             self.ctx.dbg("Exception on logout: %s" % e)
         store.remove(*previous[:-1])
         # Last is still useful. Not resetting.

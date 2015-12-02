@@ -581,6 +581,7 @@ class MonitorClientI(monitors.MonitorClient):
         """
         Logs out the user's session
         """
+
         if not self.ctx.hasSession():
             self.ctx.newSession()
 
@@ -694,7 +695,13 @@ class MonitorClientI(monitors.MonitorClient):
                     self.log.error("%s not found !" % t)
                 self.log.error("***** end of output from importer-cli *****")
         finally:
-            #self.logoutUser(sess)
+            # self.logoutUser(sess)
+            cmd = ["logout"]
+            self.log.info("cli.invoke(%s)" % cmd)
+            cli.invoke(cmd)
+            retCode = cli.rv
+            self.log.info("cli.rv = %s" % retCode)
+
             remove_path(t)
             remove_path(to)
 
