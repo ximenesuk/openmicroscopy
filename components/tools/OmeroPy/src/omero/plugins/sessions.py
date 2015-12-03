@@ -573,6 +573,7 @@ class SessionsControl(BaseControl):
         store = self.store(args)
         previous = store.get_current()
 
+        print "Previous session: " + str(previous)
         if args.key:
             previous = list(previous)
             previous[2] = args.key

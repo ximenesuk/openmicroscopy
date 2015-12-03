@@ -694,9 +694,10 @@ class MonitorClientI(monitors.MonitorClient):
                 else:
                     self.log.error("%s not found !" % t)
                 self.log.error("***** end of output from importer-cli *****")
+
         finally:
             # self.logoutUser(sess)
-            cmd = ["logout"]
+            cmd = ["sessions", "logout", "-k", key]
             self.log.info("cli.invoke(%s)" % cmd)
             cli.invoke(cmd)
             retCode = cli.rv

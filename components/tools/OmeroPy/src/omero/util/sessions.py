@@ -206,22 +206,19 @@ class SessionsStore(object):
         host = None
         name = None
         uuid = None
-        print "get_current"
         if self.host_file().exists():
             host = self.host_file().text().strip()
-        print str(host)
         if host:
             try:
                 name = self.user_file(host).text().strip()
             except IOError:
                 pass
-        print name
         if name:
             try:
                 uuid = self.sess_file(host, name).text().strip()
             except Exception, e:
                 print "Error getting uuid: %s" % str(e)
-        print uuid
+        print "get_current", str(host), name, uuid
         return (host, name, uuid, self.last_port())
 
     def last_host(self):
