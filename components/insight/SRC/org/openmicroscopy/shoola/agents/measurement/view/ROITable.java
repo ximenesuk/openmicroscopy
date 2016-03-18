@@ -136,6 +136,15 @@ public class ROITable
 	/** Holds the previously used selection, used for resetting the selection */
 	private int[] previousSelectionIndices;
 	
+	/** Only Folders which contain this String will be displayed */
+	private String folderNameFilter= "";
+	
+	/** If set, only Folders with the given Ids will be displayed */
+	private Collection<Long> onlyShowFolderIds = null;
+	
+	/** Overrides the filtering mechanisms */
+	private boolean ignoreFilters = false;
+	
     /**
      * Reference to folders which have been recently modified (ROIs
      * added/removed)
@@ -419,6 +428,45 @@ public class ROITable
 		this.repaint();
 	}
 
+    /**
+     * Set the name filter
+     * 
+     * @param filter
+     *            Only show folders which contain this String
+     */
+    public void setNameFilter(String filter) {
+        this.folderNameFilter = filter.toLowerCase();
+    }
+
+    /**
+     * Set the Ids filter
+     * 
+     * @param onlyShowFolderIds
+     *            Only show folders with the given Ids
+     */
+    public void setIDFilter(Collection<Long> onlyShowFolderIds) {
+        this.onlyShowFolderIds = onlyShowFolderIds;
+    }
+    
+    /**
+     * Reference to the list of folder ids which should be displayed.
+     * Can be empty (ie all folders shown).
+     * @return See above.
+     */
+    public Collection<Long> getIDFilter() {
+        return this.onlyShowFolderIds;
+    }
+
+    /**
+     * Enable/Disable filtering
+     * 
+     * @param b
+     *            Pass <code>false</code> to disable filtering
+     */
+    public void setIgnoreFilters(boolean b) {
+        this.ignoreFilters = b;
+    }
+	
 	/**
 	 * Set the value of the object at row and column to value object, 
 	 * this will also expand the row of the object set, unless the ROI
@@ -726,6 +774,21 @@ public class ROITable
 	    return result;
 	}
 	
+    /**
+     * Determines if the given Folder should be displayed or not, taking the
+     * different filtering options into account
+     * 
+     * @param folder
+     *            The Folder to check
+     * @return See above.
+     */
+    private boolean displayFolder(FolderData folder) {
+        return ignoreFilters
+                || ((onlyShowFolderIds == null || onlyShowFolderIds
+                        .contains(folder.getId())) && folder.getName()
+                        .toLowerCase().contains(folderNameFilter));
+    }
+
 	/**
      * Finds the ROI Folder nodes of the ROI.
      * Folders which don't exist yet, will be created.
@@ -740,13 +803,15 @@ public class ROITable
         Collection<ROINode> insertInto = new ArrayList<ROINode>();
         
         for (FolderData f : roi.getFolders()) {
-            ROINode node = findFolderNode(nodes, f);
-            if (node == null) {
-                node = new ROINode(f);
-                nodes.add(node);
-                handleParentFolderNodes(node);
+            if (displayFolder(f)) {
+                ROINode node = findFolderNode(nodes, f);
+                if (node == null) {
+                    node = new ROINode(f);
+                    nodes.add(node);
+                    handleParentFolderNodes(node);
+                }
+                insertInto.add(node);
             }
-            insertInto.add(node);
         }
         
         return insertInto;
@@ -814,16 +879,18 @@ public class ROITable
     /**
      * Initializes the Folder nodes, independently from the ROIs
      * 
-     * @param folder
+     * @param folders
      *            The folders
      */
     public void initFolders(Collection<FolderData> folders) {
         for (FolderData f : folders) {
-            ROINode node = findFolderNode(nodes, f);
-            if (node == null) {
-                node = new ROINode(f);
-                nodes.add(node);
-                handleParentFolderNodes(node);
+            if (displayFolder(f)) {
+                ROINode node = findFolderNode(nodes, f);
+                if (node == null) {
+                    node = new ROINode(f);
+                    nodes.add(node);
+                    handleParentFolderNodes(node);
+                }
             }
         }
         model = new ROITableModel(root, columnNames);
@@ -1238,8 +1305,10 @@ public class ROITable
     public void addToFolder() {
         action = CreationActionType.ADD_TO_FOLDER;
         Collection<Object> tmp = new ArrayList<Object>();
-        for(FolderData folder : manager.getFolders()) 
+        for(FolderData folder : manager.getFolders()) {
+            if(displayFolder(folder))    
                 tmp.add(folder);
+        }
         SelectionWizard wiz = new SelectionWizard(null, tmp, FolderData.class, manager.canEdit(), MeasurementAgent.getUserDetails());
         wiz.setTitle("Add to ROI Folders", "Select the Folders to add the ROI(s) to", IconManager.getInstance().getIcon(IconManager.ROIFOLDER));
         wiz.addPropertyChangeListener(this);
