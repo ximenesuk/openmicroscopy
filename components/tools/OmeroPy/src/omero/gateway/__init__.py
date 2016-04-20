@@ -834,7 +834,8 @@ class BlitzObjectWrapper (object):
         # Need to set group context. If '-1' then canDelete() etc on
         # annotations will be False
         ctx = self._conn.SERVICE_OPTS.copy()
-        ctx.setOmeroGroup(self.details.group.id.val)
+        if (self.details.group is not None):
+            ctx.setOmeroGroup(self.details.group.id.val)
         if not self._obj.isAnnotationLinksLoaded():
             query = ("select l from %sAnnotationLink as l join "
                      "fetch l.details.owner join "
