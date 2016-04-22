@@ -58,6 +58,9 @@ class QuotaControl(CmdControl):
                   "'Experimenter:<Id>[,<Id> ...]', or 'Experimenter:*' "
                   "to query all users."))
         status.add_argument(
+            "--all", action="store_true",
+            help="Return the quota details even if usage is zero.")
+        status.add_argument(
             "--wait", type=long,
             help="Number of seconds to wait for the processing to complete "
             "(Indefinite < 0; No wait=0).", default=-1)
@@ -103,7 +106,7 @@ class QuotaControl(CmdControl):
             if err:
                 self.ctx.err("Error: " + rsp.parameters['message'])
             else:
-                self._quota_report(rsp, args)
+                self._quota_report(rsp, ids, args)
         finally:
             if cb is not None:
                 cb.close(True)  # Close handle
@@ -188,39 +191,62 @@ class QuotaControl(CmdControl):
             raise ValueError("Bad object specification: %s" % obj)
         return (klass, ids)
 
-    def _quota_report(self, rsp, args):
+    def _quota_report(self, rsp, ids, args):
         """
         Generate a report containing the bytes used and quota per user.
         """
-        subtotals = {}
-
+        usage = {}
         for userGroup in rsp.totalBytesUsed.keys():
             size = rsp.totalBytesUsed[userGroup]
             key = userGroup.first
-            if key in subtotals.keys():
-                subtotals[key] += size
+            if key in usage.keys():
+                usage[key] += size
             else:
-                subtotals[key] = size
+                usage[key] = size
 
+        table = {}
         client = self.ctx.conn(args)
         gateway = BlitzGateway(client_obj=client)
         gateway.SERVICE_OPTS.setOmeroGroup("-1")
-        for key in subtotals.keys():
-            user = gateway.getObject("Experimenter", key)
+
+        if args.all:
+            if ids:
+                users = self._get_experimenters(ids, gateway)
+            else:
+                users = gateway.findExperimenters()
+        elif args:
+            users = self._get_experimenters(usage.keys(), gateway)
+
+        for user in users:
+            key = user._obj.id.val
             ma = self._get_quota_map(user)
             if ma and ma._obj.getMapValue()[0].name == "Quota":
                 q = long(ma._obj.getMapValue()[0].value)
                 if q != 0:
-                    percent = int(100.0*subtotals[key]/q)
+                    if args.all and key not in usage.keys():
+                        percent = 0
+                    else:
+                        percent = int(100.0*usage[key]/q)
                 else:
-                    percent = "NA"
-                subtotals[key] = (subtotals[key], q, "%s%%" % percent)
+                    percent = ""
+                if args.all and key not in usage.keys():
+                    table[key] = (0, q, "%s%%" % percent)
+                else:
+                    table[key] = (usage[key], q, "%s%%" % percent)
             else:
-                subtotals[key] = (subtotals[key], None, "NA")
-        if len(subtotals.keys()) > 1:
-            self._multiple_quota_report(subtotals, args)
+                if args.all and key not in usage.keys():
+                    table[key] = (0,  None, "")
+                else:
+                    table[key] = (usage[key], None, "")
+
+        if len(table.keys()) > 1:
+            self._multiple_quota_report(table, args)
         else:
-            self._single_quota_report(subtotals.values()[0])
+            self._single_quota_report(table.values()[0])
+
+    def _get_experimenters(self, ids, gateway):
+        for id in ids:
+            yield gateway.getObject("Experimenter", id)
 
     def _single_quota_report(self, values):
         """
